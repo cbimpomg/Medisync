@@ -15,12 +15,15 @@ import Signup from "./pages/auth/Signup";
 // Patient pages
 import PatientDashboard from "./pages/patient/Dashboard";
 import BookAppointment from "./pages/patient/BookAppointment";
+import PatientMessages from "./pages/patient/Messages";
 
 // Doctor pages
 import DoctorDashboard from "./pages/doctor/Dashboard";
+import DoctorMessages from "./pages/doctor/Messages";
 
 // Nurse pages
 import NurseDashboard from "./pages/nurse/Dashboard";
+import NurseMessages from "./pages/nurse/Messages";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -43,6 +46,7 @@ const App = () => (
             {/* Patient Routes */}
             <Route path="/dashboard" element={<PatientDashboard />} />
             <Route path="/book-appointment" element={<BookAppointment />} />
+            <Route path="/messages" element={<PatientMessages />} />
             
             {/* Doctor Routes */}
             <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
@@ -50,7 +54,7 @@ const App = () => (
             <Route path="/doctor/patients" element={<NotFound />} />
             <Route path="/doctor/prescriptions" element={<NotFound />} />
             <Route path="/doctor/medical-records" element={<NotFound />} />
-            <Route path="/doctor/messages" element={<NotFound />} />
+            <Route path="/doctor/messages" element={<DoctorMessages />} />
             <Route path="/doctor/telehealth" element={<NotFound />} />
             <Route path="/doctor/lab-results" element={<NotFound />} />
             
@@ -62,7 +66,7 @@ const App = () => (
             <Route path="/nurse/care-plans" element={<NotFound />} />
             <Route path="/nurse/tasks" element={<NotFound />} />
             <Route path="/nurse/medications" element={<NotFound />} />
-            <Route path="/nurse/messages" element={<NotFound />} />
+            <Route path="/nurse/messages" element={<NurseMessages />} />
             
             {/* Admin Routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
