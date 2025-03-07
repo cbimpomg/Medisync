@@ -7,7 +7,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'patient' | 'doctor' | 'admin';
+  role: 'patient' | 'doctor' | 'nurse' | 'admin';
 }
 
 interface AuthContextType {
@@ -43,9 +43,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // For demo, we'll simulate the login with mock data
       const mockUser: User = {
         id: '123',
-        name: userType === 'patient' ? 'Ransford' : 'Dr. John Doe',
+        name: getUserNameByRole(userType),
         email: email,
-        role: userType as 'patient' | 'doctor' | 'admin',
+        role: userType as 'patient' | 'doctor' | 'nurse' | 'admin',
       };
       
       // Simulate API delay
@@ -61,9 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Redirect based on user role
       if (userType === 'admin') {
-        navigate('/admin');
+        navigate('/admin/dashboard');
       } else if (userType === 'doctor') {
         navigate('/doctor/dashboard');
+      } else if (userType === 'nurse') {
+        navigate('/nurse/dashboard');
       } else {
         navigate('/dashboard');
       }
@@ -79,6 +81,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const getUserNameByRole = (role: string): string => {
+    switch(role) {
+      case 'patient':
+        return 'Ransford';
+      case 'doctor':
+        return 'Dr. John Smith';
+      case 'nurse':
+        return 'Nurse Sarah Williams';
+      case 'admin':
+        return 'Admin User';
+      default:
+        return 'User';
+    }
+  };
+
   const signup = async (userData: any) => {
     try {
       setIsLoading(true);
@@ -87,9 +104,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // For demo, we'll simulate the signup with mock data
       const mockUser: User = {
         id: '123',
-        name: userData.name || 'New User',
+        name: userData.name || getUserNameByRole(userData.userType),
         email: userData.email,
-        role: userData.userType as 'patient' | 'doctor' | 'admin',
+        role: userData.userType as 'patient' | 'doctor' | 'nurse' | 'admin',
       };
       
       // Simulate API delay
@@ -105,9 +122,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Redirect based on user role
       if (userData.userType === 'admin') {
-        navigate('/admin');
+        navigate('/admin/dashboard');
       } else if (userData.userType === 'doctor') {
         navigate('/doctor/dashboard');
+      } else if (userData.userType === 'nurse') {
+        navigate('/nurse/dashboard');
       } else {
         navigate('/dashboard');
       }
