@@ -1,12 +1,15 @@
 
 import React from 'react';
-import { useAuth } from '@/hooks/useAuth';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import AdminSidebar from '@/components/layout/AdminSidebar';
 import { BarChart, Users, Calendar, Activity, BedDouble, Clock } from 'lucide-react';
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  // Mock user data
+  const mockUser = {
+    name: 'Admin User'
+  };
   
   return (
     <div className="flex h-screen bg-gray-50">
@@ -16,7 +19,7 @@ const AdminDashboard = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {user?.name || 'Admin'}</p>
+            <p className="text-gray-600">Welcome back, {mockUser.name}</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

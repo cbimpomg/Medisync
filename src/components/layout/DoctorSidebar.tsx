@@ -1,5 +1,4 @@
-
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -9,14 +8,21 @@ import {
   MessageCircle, 
   Video,
   FileText,
-  Activity
+  Activity,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
+
+import { Button } from "@/components/ui/button";
 
 const DoctorSidebar = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  // Mock user data for now
+  const mockUser = {
+    name: 'Doctor',
+    role: 'doctor'
+  };
   
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/doctor/dashboard' },
@@ -29,16 +35,21 @@ const DoctorSidebar = () => {
     { icon: Activity, label: 'Lab Results', path: '/doctor/lab-results' },
   ];
 
+  const handleLogout = () => {
+    // Handle logout without auth
+    navigate('/signup');
+  };
+
   return (
     <div className="doctor-sidebar w-64 flex flex-col h-full">
       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-medisync-primary text-white flex items-center justify-center">
-          <span className="font-bold">{user?.name?.charAt(0) || 'D'}</span>
+          <span className="font-bold">{mockUser.name.charAt(0)}</span>
         </div>
         <div>
-          <h3 className="font-medium text-medisync-text">{user?.name || 'Doctor'}</h3>
+          <h3 className="font-medium text-medisync-text">{mockUser.name}</h3>
           <p className="text-sm text-gray-500">
-            {user?.role === 'doctor' ? 'Doctor' : 'Healthcare Provider'}
+            {mockUser.role === 'doctor' ? 'Doctor' : 'Healthcare Provider'}
           </p>
         </div>
       </div>
@@ -58,6 +69,17 @@ const DoctorSidebar = () => {
           </Link>
         ))}
       </nav>
+
+      <div className="p-3 border-t border-gray-200">
+        <Button
+          variant="ghost"
+          className="w-full flex items-center gap-3 text-red-600 hover:bg-red-50 hover:text-red-700"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </Button>
+      </div>
     </div>
   );
 };

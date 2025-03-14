@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
-import { Calendar, Clock, Users, Pill, Activity, MessageSquare } from 'lucide-react';
+import { Calendar, Clock, Users, Pill, Activity, MessageSquare, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Mock data for appointments
@@ -16,7 +15,11 @@ const mockAppointments = [
 ];
 
 const DoctorDashboard = () => {
-  const { user } = useAuth();
+  // Mock user data for now
+  const mockUser = {
+    name: 'Dr. Smith',
+    id: '123'
+  };
   const [date, setDate] = useState(new Date());
   
   return (
@@ -27,7 +30,7 @@ const DoctorDashboard = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Doctor Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {user?.name || 'Dr. Smith'}</p>
+            <p className="text-gray-600">Welcome back, {mockUser.name}</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -39,7 +42,7 @@ const DoctorDashboard = () => {
             <StatsCard 
               title="Pending Reports" 
               value="7" 
-              icon={<ClipboardIcon className="h-8 w-8 text-medisync-primary" />} 
+              icon={<ClipboardList className="h-8 w-8 text-medisync-primary" />} 
             />
             <StatsCard 
               title="Prescriptions" 
@@ -71,38 +74,27 @@ const DoctorDashboard = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {mockAppointments.map((appointment) => (
-                      <div key={appointment.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            appointment.status === "Checked In" 
-                              ? "bg-green-100 text-green-800" 
-                              : appointment.status === "Cancelled" 
-                                ? "bg-red-100 text-red-800" 
-                                : "bg-blue-100 text-blue-800"
-                          }`}>
-                            {appointment.patient.charAt(0)}
+                      <div 
+                        key={appointment.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-blue-600 font-medium">{appointment.patient.charAt(0)}</span>
                           </div>
                           <div>
-                            <h4 className="font-medium">{appointment.patient}</h4>
+                            <h3 className="font-medium">{appointment.patient}</h3>
                             <div className="flex items-center text-sm text-gray-500">
-                              <Clock className="h-3 w-3 mr-1" />
+                              <Clock className="h-4 w-4 mr-1" />
                               {appointment.time} - {appointment.type}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            appointment.status === "Checked In" 
-                              ? "bg-green-100 text-green-800" 
-                              : appointment.status === "Cancelled" 
-                                ? "bg-red-100 text-red-800" 
-                                : "bg-blue-100 text-blue-800"
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
                             {appointment.status}
                           </span>
-                          <Button variant="outline" size="sm">
-                            View
-                          </Button>
+                          <Button variant="outline" size="sm">View Details</Button>
                         </div>
                       </div>
                     ))}
@@ -113,36 +105,38 @@ const DoctorDashboard = () => {
             
             <Card>
               <CardHeader>
-                <CardTitle>Recent Patient Activity</CardTitle>
-                <CardDescription>Updates from your patients</CardDescription>
+                <CardTitle>Activity</CardTitle>
+                <CardDescription>Your recent activity</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <ActivityItem 
-                    description="Emma Johnson updated her symptoms"
-                    time="10 min ago"
-                    icon={<Activity className="h-4 w-4 text-medisync-primary" />}
-                  />
-                  <ActivityItem 
-                    description="Lab results for Michael Chen are ready"
-                    time="45 min ago"
-                    icon={<ClipboardIcon className="h-4 w-4 text-medisync-primary" />}
-                  />
-                  <ActivityItem 
-                    description="New message from Sophia Rodriguez"
-                    time="1 hour ago"
-                    icon={<MessageSquare className="h-4 w-4 text-medisync-primary" />}
-                  />
-                  <ActivityItem 
-                    description="Prescription refill requested by Noah Williams"
-                    time="3 hours ago"
-                    icon={<Pill className="h-4 w-4 text-medisync-primary" />}
-                  />
-                  <ActivityItem 
-                    description="Appointment rescheduled by Ransford Agyei"
-                    time="Yesterday"
-                    icon={<Calendar className="h-4 w-4 text-medisync-primary" />}
-                  />
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                      <Activity className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Patient Consultation Completed</p>
+                      <p className="text-sm text-gray-500">30 minutes ago</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Pill className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Prescription Updated</p>
+                      <p className="text-sm text-gray-500">1 hour ago</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <MessageSquare className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">New Message Received</p>
+                      <p className="text-sm text-gray-500">2 hours ago</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -177,44 +171,17 @@ const StatsCard = ({ title, value, icon }: StatsCardProps) => {
   );
 };
 
-const ClipboardIcon = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <rect width="14" height="14" x="5" y="5" rx="2" />
-    <path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
-    <path d="M8 10h8" />
-    <path d="M8 14h4" />
-  </svg>
-);
-
-interface ActivityItemProps {
-  description: string;
-  time: string;
-  icon: React.ReactNode;
-}
-
-const ActivityItem = ({ description, time, icon }: ActivityItemProps) => {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="bg-medisync-primary bg-opacity-10 p-2 rounded-full mt-0.5">
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm text-gray-700">{description}</p>
-        <span className="text-xs text-gray-500">{time}</span>
-      </div>
-    </div>
-  );
+const getStatusColor = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'checked in':
+      return 'bg-green-100 text-green-800';
+    case 'scheduled':
+      return 'bg-blue-100 text-blue-800';
+    case 'cancelled':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
 };
 
 export default DoctorDashboard;

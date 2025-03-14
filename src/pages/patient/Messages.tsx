@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+
 import PatientSidebar from '@/components/layout/PatientSidebar';
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Send, Paperclip, MoreVertical, Phone, Video } from 'lucide-react';
+import { Search, Send, Paperclip, MoreVertical, Phone, Video, MessageSquare } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
@@ -124,7 +124,11 @@ const mockMessages = [
 ];
 
 const PatientMessages = () => {
-  const { user } = useAuth();
+  // Mock user data for now
+  const mockUser = {
+    name: 'Patient',
+    id: '123'
+  };
   const [selectedConversation, setSelectedConversation] = useState(mockConversations[0]);
   const [newMessage, setNewMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");

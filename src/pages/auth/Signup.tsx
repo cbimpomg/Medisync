@@ -1,11 +1,10 @@
-
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from '@/hooks/useAuth';
+
 import { 
   Select,
   SelectContent,
@@ -14,41 +13,66 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { useAuth } from "@/hooks/useAuth";
+
 const Signup = () => {
+  const { signUp, loading, error } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    userType: 'patient',
+    userType: 'patient' as 'admin' | 'doctor' | 'nurse' | 'patient'
   });
+  
+  const handleUserTypeChange = (value: 'admin' | 'doctor' | 'nurse' | 'patient') => {
+    setFormData(prev => ({ ...prev, userType: value }));
+  };
   const [showPassword, setShowPassword] = useState(false);
-  const { signup, isLoading } = useAuth();
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleUserTypeChange = (value: string) => {
-    setFormData(prev => ({ ...prev, userType: value }));
-  };
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await signup(formData);
+    try {
+      await signUp(formData.email, formData.password, {
+        displayName: formData.name,
+        role: formData.userType,
+        email: formData.email,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Signup error:', error);
+    }
   };
   
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      <div className="w-full md:w-1/2 lg:w-2/5 p-8 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-lg animate-fade-in">
+      <div className="w-full md:w-1/2 lg:w-2/5 p-8 flex items-center justify-center relative">
+        {/* Background pharmaceutical image for the form section */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="/images/pharmaceutical-exam-treatment-health-white-pharmacy.jpg"
+            alt="Pharmaceutical treatment" 
+            className="object-cover w-full h-full"
+          />
+          <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px]"></div>
+        </div>
+        
+        <div className="max-w-md w-full bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg animate-fade-in z-10 relative">
           <div className="flex justify-between mb-6">
             <button className="text-medisync-primary font-medium px-4 py-2 rounded-full bg-medisync-accent">
               Sign Up
             </button>
-            <button className="text-medisync-primary font-medium px-4 py-2 rounded-full bg-transparent hover:bg-medisync-accent transition-colors">
-              Log in
-            </button>
+            <Link to="/login">
+              <button className="text-medisync-primary font-medium px-4 py-2 rounded-full bg-transparent hover:bg-medisync-accent transition-colors">
+                Log in
+              </button>
+            </Link>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -124,9 +148,9 @@ const Signup = () => {
             <Button 
               type="submit" 
               className="w-full bg-medisync-primary hover:bg-medisync-secondary text-white py-3 rounded-lg font-medium"
-              disabled={isLoading}
+              disabled={false}
             >
-              {isLoading ? "Creating Account..." : "Create Account"}
+              Create Account
             </Button>
           </form>
           
@@ -154,8 +178,12 @@ const Signup = () => {
       
       <div className="w-full md:w-1/2 lg:w-3/5 bg-gray-100 hidden md:block">
         <div className="h-full w-full relative">
+          {/* Background gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-medisync-primary/20 to-transparent z-10"></div>
+          
+          {/* Team of doctors image */}
           <img 
-            src="public/lovable-uploads/472d0c98-1c09-465f-8564-2c8c57656629.png"
+            src="/images/team-young-specialist-doctors-standing-corridor-hospital.jpg"
             alt="Healthcare professionals" 
             className="object-cover w-full h-full"
           />

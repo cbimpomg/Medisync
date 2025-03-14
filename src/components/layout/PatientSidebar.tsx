@@ -1,5 +1,4 @@
-
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -8,14 +7,21 @@ import {
   ShoppingBag, 
   MessageCircle, 
   Video,
-  Brain
+  Brain,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
+
+import { Button } from "@/components/ui/button";
 
 const PatientSidebar = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  // Mock user data for now
+  const mockUser = {
+    name: 'Patient',
+    id: '123'
+  };
   
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -28,15 +34,20 @@ const PatientSidebar = () => {
     { icon: Brain, label: 'AI Symptom Checker', path: '/symptom-checker' },
   ];
 
+  const handleLogout = () => {
+    // Handle logout without auth
+    navigate('/signup');
+  };
+
   return (
-    <div className="patient-sidebar w-64 flex flex-col h-full">
+    <div className="patient-sidebar w-64 flex flex-col h-full bg-white/90 shadow-lg">
       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-medisync-primary text-white flex items-center justify-center">
-          <span className="font-bold">{user?.name?.charAt(0) || 'P'}</span>
+        <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
+          <span className="font-bold">{mockUser.name.charAt(0)}</span>
         </div>
         <div>
-          <h3 className="font-medium text-medisync-text">{user?.name || 'Patient'}</h3>
-          <p className="text-sm text-gray-500">PatientID: {user?.id || '123'}</p>
+          <h3 className="font-medium text-gray-800">{mockUser.name}</h3>
+          <p className="text-sm text-gray-500">PatientID: {mockUser.id}</p>
         </div>
       </div>
       
@@ -46,8 +57,8 @@ const PatientSidebar = () => {
             key={item.path}
             to={item.path}
             className={cn(
-              "patient-sidebar-item",
-              location.pathname === item.path && "active"
+              "patient-sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors",
+              location.pathname === item.path && "bg-blue-100 text-blue-600 font-medium"
             )}
           >
             <item.icon className="h-5 w-5" />
@@ -55,6 +66,17 @@ const PatientSidebar = () => {
           </Link>
         ))}
       </nav>
+
+      <div className="p-3 border-t border-gray-200">
+        <Button
+          variant="ghost"
+          className="w-full flex items-center gap-3 text-red-600 hover:bg-red-50 hover:text-red-700"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </Button>
+      </div>
     </div>
   );
 };

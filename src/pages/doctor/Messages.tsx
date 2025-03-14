@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -142,7 +142,11 @@ const mockMessages = [
 ];
 
 const DoctorMessages = () => {
-  const { user } = useAuth();
+  // Mock user data for now
+  const mockUser = {
+    name: 'Dr. Smith',
+    id: '123'
+  };
   const [selectedConversation, setSelectedConversation] = useState(mockConversations[0]);
   const [newMessage, setNewMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");

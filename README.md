@@ -67,3 +67,60 @@ Simply open [Lovable](https://lovable.dev/projects/05c3bc44-13a7-42f0-9b97-513a3
 ## I want to use a custom domain - is that possible?
 
 We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+
+## Backend Architecture and Technology Stack
+
+A. Core Services:
+1. Auth Service
+   - Technology: Node.js + Express
+   - Responsibility: Authentication, authorization, user management
+
+2. Patient Service
+   - Technology: Node.js + Express
+   - Responsibility: Patient management, medical records
+
+3. Doctor Service
+   - Technology: Node.js + Express
+   - Responsibility: Doctor management, schedules
+
+4. Appointment Service
+   - Technology: Node.js + Express
+   - Responsibility: Appointment scheduling, management
+
+5. Prescription Service
+   - Technology: Node.js + Express
+   - Responsibility: Prescription management
+
+6. Billing Service
+   - Technology: Node.js + Express
+   - Responsibility: Billing, payments, insurance
+
+B. Supporting Services:
+1. Notification Service
+   - Technology: Node.js + Bull for queue management
+   - Responsibility: Email, SMS, in-app notifications
+
+2. File Service
+   - Technology: Node.js + Express
+   - Responsibility: File upload, storage management
+
+3. Report Service
+   - Technology: Node.js + Express
+   - Responsibility: Generate and manage reports
+
+C. Infrastructure:
+1. API Gateway
+   - Technology: Kong or Netflix Zuul
+   - Responsibility: Route management, rate limiting
+
+2. Service Discovery
+   - Technology: Consul
+   - Responsibility: Service registration and discovery
+
+3. Message Broker
+   - Technology: RabbitMQ
+   - Responsibility: Inter-service communication
+
+4. Monitoring
+   - Technology: Prometheus + Grafana
+   - Responsibility: System monitoring and alerts

@@ -1,8 +1,7 @@
-
 import { useEffect, useState } from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import PatientSidebar from '@/components/layout/PatientSidebar';
-import { useAuth } from '@/hooks/useAuth';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -24,20 +23,32 @@ const mockDashboardData = {
 };
 
 const PatientDashboard = () => {
-  const { user } = useAuth();
+  // Mock user data for now
+  const mockUser = {
+    name: 'Ransford'
+  };
   
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen overflow-hidden">
       <PatientSidebar />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6 flex-1 overflow-y-auto">
+      <div 
+        className="flex-1 flex flex-col overflow-hidden relative"
+        style={{ 
+          backgroundImage: 'url("/images/blur-hospital.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        {/* Removed overlay to show the background image at full clarity */}
+        
+        <div className="p-6 flex-1 overflow-y-auto relative z-10">
           <div className="mb-6 animate-fade-in">
-            <h1 className="text-2xl font-bold text-gray-800">Welcome back, {user?.name || 'Ransford'}</h1>
+            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">Welcome back, {mockUser.name}</h1>
           </div>
           
           <div className="mb-8 animate-slide-up">
-            <Card className="bg-medisync-primary text-white">
+            <Card className="bg-medisync-primary text-white shadow-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="text-2xl">Next Appointment</CardTitle>
                 <CardDescription className="text-white/80">
@@ -157,14 +168,14 @@ const ServiceCard = ({ title, description, icon, link, delay = 0 }: ServiceCardP
   }
   
   return (
-    <Card className={`dashboard-card hover:border-medisync-primary transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+    <Card className={`dashboard-card hover:border-medisync-primary transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'} bg-white/85 shadow-xl hover:shadow-2xl border-2 border-white`}>
       <CardContent className="p-6">
         <div className="mb-4">
           {IconComponent}
         </div>
-        <CardTitle className="text-lg mb-2">{title}</CardTitle>
-        <CardDescription className="mb-4">{description}</CardDescription>
-        <Button className="w-full bg-medisync-primary hover:bg-medisync-secondary" asChild>
+        <CardTitle className="text-lg mb-2 text-gray-900 font-bold">{title}</CardTitle>
+        <CardDescription className="mb-4 text-gray-700 font-medium">{description}</CardDescription>
+        <Button className="w-full bg-medisync-primary hover:bg-medisync-secondary font-semibold" asChild>
           <a href={link}>View</a>
         </Button>
       </CardContent>
