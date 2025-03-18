@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Welcome to your Lovable project
 
 ## Project info
@@ -124,3 +125,6 @@ C. Infrastructure:
 4. Monitoring
    - Technology: Prometheus + Grafana
    - Responsibility: System monitoring and alerts
+=======
+# Medisync
+>>>>>>> 66929efeeb65c774fb14a1b2c471d079ec6cb25a
