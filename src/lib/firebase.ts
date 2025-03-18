@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
@@ -17,24 +17,12 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with proper typing
-export const db = getFirestore(app);
-
-// Configure Firestore settings with proper error handling
-try {
-  // Enable offline persistence with proper error handling
-  enableIndexedDbPersistence(db, {
-    forceOwnership: true // Ensure only one tab can access the database
-  }).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.error('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.error('The current browser does not support persistence.');
-    }
-  });
-} catch (error) {
-  console.error('Error configuring Firestore:', error);
-}
+// Initialize Firestore with persistent cache configuration
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+    })
+});
 
 // Initialize and export Firebase services
 export const auth = getAuth(app);
@@ -125,7 +113,7 @@ export interface Message {
   id: string;
   senderId: string;
   receiverId: string;
-  content: string;
+  content: string;3
   read: boolean;
   createdAt: Date;
 }

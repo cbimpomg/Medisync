@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -7,18 +8,19 @@ import {
   FileBarChart, 
   CreditCard,
   Settings,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from "@/components/ui/button";
+import UserProfile from '@/components/UserProfile';
 
 const AdminSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  // Mock user data for now
-  const mockUser = {
-    name: 'Admin',
-    role: 'admin'
-  };
+  const { user } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
   
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
@@ -33,14 +35,19 @@ const AdminSidebar = () => {
   return (
     <div className="bg-white border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-medisync-primary text-white flex items-center justify-center">
-          <span className="font-bold">{mockUser.name.charAt(0)}</span>
-        </div>
+        <button 
+          onClick={() => setProfileOpen(true)} 
+          className="w-10 h-10 rounded-full bg-red-100 text-red-800 flex items-center justify-center hover:bg-red-200 transition-colors"
+        >
+          <span className="font-bold">{user?.displayName?.charAt(0) || 'A'}</span>
+        </button>
         <div>
-          <h3 className="font-medium text-medisync-text">{mockUser.name}</h3>
-          <p className="text-sm text-gray-500">{mockUser.role === 'admin' ? 'Administrator' : 'Staff'}</p>
+          <h3 className="font-medium text-medisync-text">{user?.displayName || 'Admin'}</h3>
+          <p className="text-sm text-gray-500">Administrator</p>
         </div>
       </div>
+      
+      <UserProfile open={profileOpen} onOpenChange={setProfileOpen} />
       
       <nav className="flex-1 p-3 space-y-1">
         {menuItems.map((item) => (

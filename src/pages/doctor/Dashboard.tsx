@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import { Calendar, Clock, Users, Pill, Activity, MessageSquare, ClipboardList } from 'lucide-react';
@@ -15,11 +16,8 @@ const mockAppointments = [
 ];
 
 const DoctorDashboard = () => {
-  // Mock user data for now
-  const mockUser = {
-    name: 'Dr. Smith',
-    id: '123'
-  };
+  // Use authenticated user data instead of mock data
+  const { user } = useAuth();
   const [date, setDate] = useState(new Date());
   
   return (
@@ -30,7 +28,7 @@ const DoctorDashboard = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Doctor Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {mockUser.name}</p>
+            <p className="text-gray-600">Welcome back, {user?.displayName}</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -4,6 +4,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 import { 
   Select,
@@ -13,21 +15,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { useAuth } from "@/hooks/useAuth";
-
 const Signup = () => {
-  const { signUp, loading, error } = useAuth();
   const navigate = useNavigate();
+  const { signUp, error } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    userType: 'patient' as 'admin' | 'doctor' | 'nurse' | 'patient'
+    userType: 'patient',
   });
-  
-  const handleUserTypeChange = (value: 'admin' | 'doctor' | 'nurse' | 'patient') => {
-    setFormData(prev => ({ ...prev, userType: value }));
-  };
   const [showPassword, setShowPassword] = useState(false);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,18 +32,39 @@ const Signup = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
+  const handleUserTypeChange = (value: string) => {
+    setFormData(prev => ({ ...prev, userType: value }));
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    
     try {
+      // Create user with Firebase authentication
       await signUp(formData.email, formData.password, {
         displayName: formData.name,
-        role: formData.userType,
         email: formData.email,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        role: formData.userType as 'admin' | 'doctor' | 'nurse' | 'patient'
       });
+      
+      toast({
+        title: "Account created",
+        description: "Your account has been created successfully."
+      });
+      
+      // Navigation is handled by the signUp function in useAuth
     } catch (error) {
-      console.error('Signup error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create account';
+      console.error('Signup error:', errorMessage);
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -148,9 +166,9 @@ const Signup = () => {
             <Button 
               type="submit" 
               className="w-full bg-medisync-primary hover:bg-medisync-secondary text-white py-3 rounded-lg font-medium"
-              disabled={false}
+              disabled={loading}
             >
-              Create Account
+              {loading ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
           

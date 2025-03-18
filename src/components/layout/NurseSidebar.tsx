@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -8,19 +9,19 @@ import {
   Heart,
   Pill,
   MessageCircle,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import UserProfile from '@/components/UserProfile';
 
 const NurseSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  // Mock user data for now
-  const mockUser = {
-    name: 'Nurse',
-    role: 'nurse'
-  };
+  const { user } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
   
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/nurse/dashboard' },
@@ -41,16 +42,19 @@ const NurseSidebar = () => {
   return (
     <div className="nurse-sidebar w-64 flex flex-col h-full bg-white border-r border-gray-200">
       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-medisync-primary text-white flex items-center justify-center">
-          <span className="font-bold">{mockUser.name.charAt(0)}</span>
-        </div>
+        <button 
+          onClick={() => setProfileOpen(true)} 
+          className="w-10 h-10 rounded-full bg-green-100 text-green-800 flex items-center justify-center hover:bg-green-200 transition-colors"
+        >
+          <span className="font-bold">{user?.displayName?.charAt(0) || 'N'}</span>
+        </button>
         <div>
-          <h3 className="font-medium text-medisync-text">{mockUser.name}</h3>
-          <p className="text-sm text-gray-500">
-            {mockUser.role === 'nurse' ? 'Nurse' : 'Healthcare Provider'}
-          </p>
+          <h3 className="font-medium text-medisync-text">{user?.displayName || 'Nurse'}</h3>
+          <p className="text-sm text-gray-500">Nurse</p>
         </div>
       </div>
+      
+      <UserProfile open={profileOpen} onOpenChange={setProfileOpen} />
       
       <nav className="flex-1 p-3 space-y-1">
         {menuItems.map((item) => (

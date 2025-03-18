@@ -1,12 +1,14 @@
 
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, User } from 'lucide-react';
+import { Bell, UserIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/hooks/auth-context';
 
 const Header = () => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const isAuthenticated = user !== null;
   const location = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -15,13 +17,11 @@ const Header = () => {
       <Link to="/" className="text-2xl font-bold text-medisync-primary">MediSync</Link>
       
       <div className="flex gap-4 items-center">
-        {isAuthenticated ? (
+        {isAuthenticated && user ? (
           <>
             <Link to="/notifications" className="relative">
               <Bell className="h-6 w-6 text-gray-600 hover:text-medisync-primary transition-colors" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">
-                3
-              </span>
+              {/* Only show notification badge if there are unread notifications */}
             </Link>
             
             <div className="relative">
@@ -30,15 +30,19 @@ const Header = () => {
                 className="flex items-center gap-2 hover:bg-gray-100 rounded-full p-1 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-medisync-primary text-white flex items-center justify-center">
-                  <User className="h-5 w-5" />
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || 'User'} className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <UserIcon className="h-5 w-5" />
+                  )}
                 </div>
               </button>
               
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-10 border border-gray-100">
                   <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="font-medium text-gray-800">{user?.name || "User"}</p>
-                    <p className="text-sm text-gray-500">{user?.email || ""}</p>
+                    <p className="font-medium text-gray-800">{user.displayName}</p>
+                    <p className="text-sm text-gray-500">{user.email}</p>
                   </div>
                   <Link 
                     to="/profile" 

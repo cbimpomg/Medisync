@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,10 @@ import {
 } from "@/components/ui/select";
 
 const Login = () => {
-  const { signIn, loading, error } = useAuth();
+  const navigate = useNavigate();
+  const auth = useAuth();
+  const { signIn, error } = auth;
+  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('patient');
@@ -23,10 +26,20 @@ const Login = () => {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
+      // The signIn function in useAuth already handles navigation based on the user's role
+      // We don't need to navigate here as it's handled in the useAuth hook
       await signIn(email, password);
+      
+      // Navigation is handled by the signIn function in useAuth
     } catch (error) {
-      console.error('Login error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      console.error('Login error:', errorMessage);
+      // Show error to the user
+      alert(`Login failed: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
   };
   

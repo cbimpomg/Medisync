@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import PatientSidebar from '@/components/layout/PatientSidebar';
+import { useAuth } from '@/hooks/useAuth';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,8 @@ const mockDashboardData = {
 };
 
 const PatientDashboard = () => {
-  // Mock user data for now
-  const mockUser = {
-    name: 'Ransford'
-  };
+  // Use authenticated user data instead of mock data
+  const { user } = useAuth();
   
   return (
     <div className="flex h-screen overflow-hidden">
@@ -44,7 +43,7 @@ const PatientDashboard = () => {
         
         <div className="p-6 flex-1 overflow-y-auto relative z-10">
           <div className="mb-6 animate-fade-in">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">Welcome back, {mockUser.name}</h1>
+            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">Welcome back, {user?.displayName}</h1>
           </div>
           
           <div className="mb-8 animate-slide-up">
