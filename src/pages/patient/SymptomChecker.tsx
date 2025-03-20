@@ -1,4 +1,5 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
 import { Send, Brain, AlertCircle, Info } from 'lucide-react';
 import PatientSidebar from '@/components/layout/PatientSidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { symptomService, SymptomAssessment, RecommendedAction } from "@/lib/services/symptomService";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -19,11 +23,12 @@ interface Message {
 interface Recommendation {
   title: string;
   description: string;
-  urgency: 'high' | 'medium' | 'low';
+  urgency: 'immediate' | 'soon' | 'routine';
   icon: React.ReactNode;
 }
 
 const SymptomChecker = () => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -36,9 +41,56 @@ const SymptomChecker = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [assessmentHistory, setAssessmentHistory] = useState<SymptomAssessment[]>([]);
   
-  const handleSendMessage = () => {
-    if (!input.trim()) return;
+  // Fetch assessment history when user is loaded
+  useEffect(() => {
+    if (user) {
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = 2000; // Start with 2 seconds
+
+      const fetchAssessmentHistory = async () => {
+        try {
+          const history = await symptomService.getAssessmentHistory(user.uid);
+          setAssessmentHistory(history);
+          setIsLoading(false);
+        } catch (error: any) {
+          console.error('Error fetching assessment history:', error);
+          
+          // Check if it's a connection error
+          if (!error.response && retryCount < maxRetries) {
+            retryCount++;
+            const delay = retryDelay * Math.pow(2, retryCount - 1); // Exponential backoff
+            
+            toast({
+              title: 'Connection Issue',
+              description: `Attempting to reconnect (${retryCount}/${maxRetries})...`,
+              variant: 'default'
+            });
+
+            // Retry after delay
+            setTimeout(fetchAssessmentHistory, delay);
+          } else {
+            setIsLoading(false);
+            toast({
+              title: 'Connection Error',
+              description: 'Unable to connect to the server. Please check if the backend server is running.',
+              variant: 'destructive'
+            });
+          }
+        }
+      };
+      
+      fetchAssessmentHistory();
+    }
+  }, [user]);
+
+  // Add loading state for better UX during retries
+  // const [isLoading, setIsLoading] = useState(true);
+  
+  const handleSendMessage = async () => {
+    if (!input.trim() || !user) return;
     
     // Add user message
     const userMessage: Message = {
@@ -52,84 +104,74 @@ const SymptomChecker = () => {
     setInput('');
     setIsLoading(true);
     
-    // Simulate AI response after a delay
-    setTimeout(() => {
-      // Example response based on symptoms mentioned
-      let responseContent = '';
-      let newRecommendations: Recommendation[] = [];
+    try {
+      // Submit symptoms to the backend service
+      const assessment = await symptomService.submitSymptoms({
+        patientId: user.uid,
+        symptoms: [input],
+        description: input
+      });
       
-      if (input.toLowerCase().includes('headache') || input.toLowerCase().includes('head pain')) {
-        responseContent = "Based on your description of headache, there are several possible causes including tension, migraines, dehydration, or stress. Without additional symptoms, it's likely not serious, but consistent or severe headaches should be evaluated.";
-        newRecommendations = [
-          {
-            title: 'Rest and Hydration',
-            description: 'Drink plenty of water and rest in a quiet, dark room.',
-            urgency: 'low',
-            icon: <Info className="h-5 w-5 text-blue-500" />
-          },
-          {
-            title: 'Over-the-counter Pain Relief',
-            description: 'Consider taking acetaminophen or ibuprofen if appropriate for you.',
-            urgency: 'low',
-            icon: <Info className="h-5 w-5 text-blue-500" />
-          }
-        ];
-      } else if (input.toLowerCase().includes('fever') || input.toLowerCase().includes('temperature')) {
-        responseContent = "Fever is often a sign that your body is fighting an infection. Common causes include viral infections like the flu, bacterial infections, or inflammatory conditions.";
-        newRecommendations = [
-          {
-            title: 'Monitor Temperature',
-            description: 'Keep track of your temperature readings and how long the fever persists.',
-            urgency: 'medium',
-            icon: <AlertCircle className="h-5 w-5 text-yellow-500" />
-          },
-          {
-            title: 'Consult Healthcare Provider',
-            description: 'If fever persists over 3 days or exceeds 103°F (39.4°C), contact your doctor.',
-            urgency: 'medium',
-            icon: <AlertCircle className="h-5 w-5 text-yellow-500" />
-          }
-        ];
-      } else if (input.toLowerCase().includes('chest pain') || input.toLowerCase().includes('heart')) {
-        responseContent = "Chest pain can be caused by various conditions ranging from muscle strain to serious cardiac issues. It should be taken seriously, especially if accompanied by shortness of breath, sweating, or pain radiating to the arm or jaw.";
-        newRecommendations = [
-          {
-            title: 'Seek Immediate Medical Attention',
-            description: 'Chest pain, especially with shortness of breath or radiating pain, requires immediate medical care.',
-            urgency: 'high',
-            icon: <AlertCircle className="h-5 w-5 text-red-500" />
-          }
-        ];
-      } else {
-        responseContent = "Thank you for sharing your symptoms. While I can provide general information, a proper diagnosis requires a healthcare professional. Based on what you've told me, I recommend monitoring your symptoms and considering a consultation with your doctor if they persist or worsen.";
-        newRecommendations = [
-          {
-            title: 'Monitor Symptoms',
-            description: 'Keep track of your symptoms, including when they occur and what makes them better or worse.',
-            urgency: 'low',
-            icon: <Info className="h-5 w-5 text-blue-500" />
-          },
-          {
-            title: 'Consider Consultation',
-            description: 'If symptoms persist for more than a few days, consider scheduling an appointment with your doctor.',
-            urgency: 'medium',
-            icon: <AlertCircle className="h-5 w-5 text-yellow-500" />
-          }
-        ];
-      }
-      
-      // Add AI response
+      // Add AI response from the service
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: responseContent,
+        content: assessment.analysis.possibleConditions.map(condition => 
+          `${condition.name}: ${condition.description} (Probability: ${condition.probability})`
+        ).join('\n\n') + '\n\nRecommendations:\n' + 
+        assessment.analysis.recommendedActions.map(action => 
+          `- ${action.title}: ${action.description}`
+        ).join('\n'),
         timestamp: new Date()
       };
       
       setMessages(prev => [...prev, aiMessage]);
-      setRecommendations(newRecommendations);
+      
+      // Convert service recommendations to UI recommendations
+      const uiRecommendations: Recommendation[] = assessment.analysis.recommendedActions.map(rec => ({
+        title: rec.title,
+        description: rec.description,
+        urgency: rec.urgency,
+        icon: rec.urgency === 'immediate' ? 
+          <AlertCircle className="h-5 w-5 text-red-500" /> : 
+          rec.urgency === 'soon' ? 
+            <AlertCircle className="h-5 w-5 text-yellow-500" /> : 
+            <Info className="h-5 w-5 text-blue-500" />
+      }));
+      
+      setRecommendations(uiRecommendations);
+      
+      toast({
+        title: "Assessment Complete",
+        description: "Your symptoms have been analyzed.",
+        variant: "default"
+      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error('Error processing symptoms:', error);
+      
+      // Add error message with more specific feedback
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: error.message?.includes('Unable to connect') ?
+          "I'm having trouble connecting to the medical analysis service. Please check your internet connection and try again." :
+          "I'm sorry, but I encountered an error while analyzing your symptoms. Please try again later.",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Error",
+        description: error.message?.includes('Unable to connect') ?
+          "Connection failed. Please check your internet connection." :
+          "Failed to process your symptoms. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -154,8 +196,8 @@ const SymptomChecker = () => {
         {/* Main Content */}
         <div className="p-6 flex-1 overflow-y-auto relative z-10">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">AI Symptom Checker</h1>
-            <p className="text-white drop-shadow-md mt-2">Describe your symptoms to get AI-powered insights and recommendations</p>
+            <h1 className="text-3xl font-bold text-black drop-shadow-lg shadow-black">AI Symptom Checker</h1>
+            <p className="text-black drop-shadow-md mt-2">Describe your symptoms to get AI-powered insights and recommendations</p>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -243,8 +285,9 @@ const SymptomChecker = () => {
             {/* Recommendations & Info Section */}
             <div>
               <Tabs defaultValue="recommendations" className="bg-white/85 shadow-xl rounded-lg">
-                <TabsList className="w-full grid grid-cols-2">
+                <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
                   <TabsTrigger value="info">About</TabsTrigger>
                 </TabsList>
                 
@@ -263,13 +306,13 @@ const SymptomChecker = () => {
                                   <h4 className="font-semibold">{rec.title}</h4>
                                   <Badge 
                                     className={
-                                      rec.urgency === 'high' ? 'bg-red-500' : 
-                                      rec.urgency === 'medium' ? 'bg-yellow-500' : 
+                                      rec.urgency === 'immediate' ? 'bg-red-500' : 
+                                      rec.urgency === 'soon' ? 'bg-yellow-500' : 
                                       'bg-blue-500'
                                     }
                                   >
-                                    {rec.urgency === 'high' ? 'Urgent' : 
-                                     rec.urgency === 'medium' ? 'Moderate' : 
+                                    {rec.urgency === 'immediate' ? 'Urgent' : 
+                                     rec.urgency === 'soon' ? 'Moderate' : 
                                      'Low Urgency'}
                                   </Badge>
                                 </div>
@@ -284,6 +327,60 @@ const SymptomChecker = () => {
                     <div className="text-center py-6 text-gray-500">
                       <Brain className="h-10 w-10 mx-auto mb-2 text-gray-400" />
                       <p>Describe your symptoms to get personalized recommendations</p>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="history" className="p-4">
+                  <h3 className="font-semibold text-lg mb-3">Previous Assessments</h3>
+                  
+                  {assessmentHistory.length > 0 ? (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                      {assessmentHistory.map((assessment) => (
+                        <Card key={assessment.id} className="shadow-sm">
+                          <CardContent className="p-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-semibold">
+                                  {assessment.symptoms.map(s => s.name).join(', ')}
+                                </h4>
+                                <p className="text-xs text-gray-500">
+                                  {assessment.createdAt.toLocaleDateString()} at {assessment.createdAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </p>
+                              </div>
+                              <Badge 
+                                className={
+                                  assessment.analysis.severity === 'high' ? 'bg-red-500' : 
+                                  assessment.analysis.severity === 'medium' ? 'bg-yellow-500' : 
+                                  assessment.analysis.severity === 'low' ? 'bg-blue-500' : 'bg-gray-500'
+                                }
+                              >
+                                {assessment.analysis.severity === 'high' ? 'Urgent' : 
+                                 assessment.analysis.severity === 'medium' ? 'Moderate' : 
+                                 assessment.analysis.severity === 'low' ? 'Low Urgency' : 'None'}
+                              </Badge>
+                            </div>
+                            
+                            <Separator className="my-2" />
+                            
+                            <div className="text-sm">
+                              <p className="font-medium">Possible conditions:</p>
+                              <ul className="list-disc pl-5 mt-1 text-gray-600 text-xs">
+                                {assessment.analysis.possibleConditions.slice(0, 3).map((condition, idx) => (
+                                  <li key={idx}>{condition.name}</li>
+                                ))}
+                                {assessment.analysis.possibleConditions.length > 3 && (
+                                  <li>+ {assessment.analysis.possibleConditions.length - 3} more</li>
+                                )}
+                              </ul>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-500">
+                      <p>No previous assessments found</p>
                     </div>
                   )}
                 </TabsContent>
@@ -342,4 +439,4 @@ const SymptomChecker = () => {
   );
 };
 
-export default SymptomChecker; 
+export default SymptomChecker;

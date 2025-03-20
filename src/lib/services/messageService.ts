@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db, collections, Message, User } from '../firebase';
 
 // Define allowed messaging relationships
@@ -165,6 +165,107 @@ export const messageService = {
       });
     } catch (error) {
       console.error('Error getting messages:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Subscribe to messages between two users in real-time
+   * @param userId - The current user's ID
+   * @param partnerId - The conversation partner's ID
+   * @param callback - Function to call when messages change
+   * @returns Unsubscribe function
+   */
+  subscribeToMessages(userId: string, partnerId: string, callback: (messages: Array<{
+    id: string;
+    senderId: string;
+    senderName: string;
+    content: string;
+    timestamp: string;
+    read: boolean;
+  }>) => void) {
+    try {
+      // Create queries for sent and received messages
+      const sentQuery = query(
+        collection(db, collections.messages),
+        where('senderId', '==', userId),
+        where('receiverId', '==', partnerId),
+        orderBy('createdAt', 'asc')
+      );
+      
+      const receivedQuery = query(
+        collection(db, collections.messages),
+        where('senderId', '==', partnerId),
+        where('receiverId', '==', userId),
+        orderBy('createdAt', 'asc')
+      );
+
+      // Get partner details to display the correct name
+      let partnerName = 'Unknown User';
+      getDoc(doc(db, collections.users, partnerId)).then(partnerDoc => {
+        if (partnerDoc.exists()) {
+          partnerName = (partnerDoc.data() as User).displayName;
+        }
+      });
+
+      // Set up listeners for both queries
+      const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
+        processMessagesUpdate(snapshot, true);
+      });
+
+      const unsubscribeReceived = onSnapshot(receivedQuery, (snapshot) => {
+        processMessagesUpdate(snapshot, false);
+      });
+
+      // Keep track of all messages
+      const allMessages = new Map();
+
+      // Process updates from either query
+      const processMessagesUpdate = async (snapshot, isSent) => {
+        // Mark received messages as read
+        if (!isSent) {
+          const unreadMessages = snapshot.docs.filter(doc => !doc.data().read);
+          unreadMessages.forEach(doc => {
+            updateDoc(doc.ref, { read: true });
+          });
+        }
+
+        // Update the messages map
+        snapshot.docChanges().forEach(change => {
+          const data = change.doc.data();
+          const messageId = change.doc.id;
+
+          if (change.type === 'added' || change.type === 'modified') {
+            allMessages.set(messageId, {
+              id: messageId,
+              senderId: data.senderId,
+              senderName: isSent ? 'You' : partnerName,
+              content: data.content,
+              timestamp: (data.createdAt as Timestamp)?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+              read: data.read
+            });
+          } else if (change.type === 'removed') {
+            allMessages.delete(messageId);
+          }
+        });
+
+        // Convert map to array and sort by timestamp
+        const messagesArray = Array.from(allMessages.values());
+        const sortedMessages = messagesArray.sort((a, b) => {
+          return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        });
+
+        // Call the callback with the updated messages
+        callback(sortedMessages);
+      };
+
+      // Return a function to unsubscribe from both listeners
+      return () => {
+        unsubscribeSent();
+        unsubscribeReceived();
+      };
+    } catch (error) {
+      console.error('Error subscribing to messages:', error);
       throw error;
     }
   },

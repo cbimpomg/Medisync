@@ -248,8 +248,8 @@ const Prescriptions = () => {
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="p-6 flex-1 overflow-y-auto relative z-10">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">Prescriptions</h1>
-            <p className="text-white drop-shadow-md mt-2">Manage your medications and request refills</p>
+            <h1 className="text-3xl font-bold text-black drop-shadow-lg shadow-black">Prescriptions</h1>
+            <p className="text-black drop-shadow-md mt-2">Manage your medications and request refills</p>
           </div>
           
           {/* Main Content */}

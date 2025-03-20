@@ -1,5 +1,6 @@
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db, collections, Appointment, User } from '../firebase';
+import { notificationService } from './notificationService';
 
 /**
  * Appointment Service - Handles all appointment-related operations with Firestore
@@ -19,6 +20,7 @@ export const appointmentService = {
         appointmentsQuery = query(
           collection(db, collections.appointments),
           where('doctorId', '==', userId),
+          where('status', 'in', ['scheduled', 'in-progress']),
           orderBy('date', 'asc')
         );
       } else if (role === 'patient') {
@@ -204,6 +206,30 @@ export const appointmentService = {
       };
 
       const docRef = await addDoc(collection(db, collections.appointments), newAppointment);
+      
+      // Get patient and doctor details for notification
+      const patientDoc = await getDoc(doc(db, collections.users, appointmentData.patientId));
+      const doctorDoc = await getDoc(doc(db, collections.users, appointmentData.doctorId));
+      
+      const patientData = patientDoc.exists() ? patientDoc.data() as User : null;
+      const doctorData = doctorDoc.exists() ? doctorDoc.data() as User : null;
+      
+      // Create notifications for managers and doctors
+      const notificationData = {
+        appointmentId: docRef.id,
+        patientName: patientData?.displayName || 'Unknown Patient',
+        doctorName: doctorData?.displayName || 'Unknown Doctor',
+        date: appointmentData.date instanceof Timestamp ? appointmentData.date.toDate() : new Date(appointmentData.date),
+        time: appointmentData.time,
+        type: appointmentData.type,
+        status: appointmentData.status
+      };
+
+      // Create notification for managers
+      await notificationService.createAppointmentNotification(notificationData, 'manager');
+      
+      // Create notification for the doctor
+      await notificationService.createAppointmentNotification(notificationData, 'doctor', appointmentData.doctorId);
       
       return {
         id: docRef.id,

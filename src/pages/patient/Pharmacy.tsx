@@ -1,4 +1,5 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
 import { ShoppingCart, Search, Filter, Pill, Plus, Minus, Heart, Package, ArrowLeft } from 'lucide-react';
 import PatientSidebar from '@/components/layout/PatientSidebar';
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate, useLocation } from 'react-router-dom';
+import Invoice from '@/components/pharmacy/Invoice';
+import { paystackService } from '@/lib/services/paystackService';
+ import { useAuth } from '@/hooks/useAuth';
 
 interface Medication {
   id: string;
@@ -32,13 +37,110 @@ interface CartItem {
   quantity: number;
 }
 
-const Pharmacy = () => {
+const PharmacyComponent = () => {
   const { toast } = useToast();
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <PatientSidebar />
+      <div className="flex-1 overflow-y-auto p-6">
+        <PharmacyContent />
+      </div>
+    </div>
+  );
+};
+
+const PharmacyContent = () => {
+  const { toast } = useToast();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const verifyPayment = async () => {
+      const reference = new URLSearchParams(location.search).get('reference');
+      if (reference) {
+        try {
+          const response = await paystackService.verifyTransaction(reference);
+          if (response.status && response.data.status === 'success') {
+            const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+            setOrderDetails({
+              reference: reference,
+              date: new Date().toLocaleDateString(),
+              items: cartItems,
+              total: cartItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0),
+              paymentStatus: 'success',
+              deliveryStatus: 'processing'
+            });
+            setShowInvoice(true);
+            localStorage.removeItem('cartItems');
+            setCart([]);
+          }
+        } catch (error) {
+          toast({
+            title: 'Payment Verification Failed',
+            description: 'There was an error verifying your payment.',
+            variant: 'destructive'
+          });
+        }
+      }
+    };
+
+    verifyPayment();
+  }, [location.search, toast]);
+
+  const { user } = useAuth();
+  const handleCheckout = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to proceed with checkout.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const checkoutItems = cart.map(item => ({
+      medicationId: item.id,
+      quantity: item.quantity,
+      name: item.medication.name,
+      price: item.medication.discountPrice || item.medication.price
+    }));
+    
+    const total = checkoutItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const reference = `ORDER_${Date.now()}`;
+    
+    try {
+      const response = await paystackService.initializeTransaction({
+        email: user.email,
+        amount: total * 100,
+        reference,
+        callback_url: window.location.href,
+        metadata: {
+          cart_items: checkoutItems
+        }
+      });
+
+      if (response.status && response.data.authorization_url) {
+        localStorage.setItem('cartItems', JSON.stringify(checkoutItems));
+        localStorage.setItem('orderTotal', total.toString());
+        localStorage.setItem('paymentReference', response.data.reference);
+        window.location.href = response.data.authorization_url;
+      }
+    } catch (error) {
+      toast({
+        title: 'Checkout Failed',
+        description: 'Unable to initialize payment. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
 
   // Mock medication data
   const medications: Medication[] = [
@@ -202,41 +304,49 @@ const Pharmacy = () => {
   };
 
   return (
-    <div 
-      className="flex h-screen overflow-hidden"
-      style={{ 
-        backgroundImage: 'url("/images/blur-hospital.jpg")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      }}
-    >
-      <PatientSidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="p-6 flex-1 overflow-y-auto relative z-10">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg">E-Pharmacy</h1>
-            <p className="text-white drop-shadow-md mt-2">Order medications and health products online</p>
-          </div>
-          
-          <div className="bg-white/90 rounded-xl shadow-xl p-6">
-            {showCart ? (
-              <div className="animate-fade-in">
-                <div className="flex items-center mb-6">
-                  <Button 
-                    variant="ghost" 
-                    className="mr-2"
-                    onClick={() => setShowCart(false)}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Shopping
-                  </Button>
-                  <h2 className="text-2xl font-semibold">Your Cart</h2>
-                </div>
-            
-                {cart.length > 0 ? (
-                  <div>
-                    {cart.map(item => (
+    <div className="container mx-auto px-4 py-8">
+      {showInvoice && orderDetails ? (
+        <Invoice orderDetails={orderDetails} onClose={() => setShowInvoice(false)} />
+      ) : (
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-bold">E-Pharmacy</h1>
+              <Button
+                variant="outline"
+                className="relative"
+                onClick={() => setShowCart(!showCart)}
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                )}
+              </Button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600">Order medications and health products online</p>
+            </div>
+            <div className="bg-white/90 rounded-xl shadow-xl p-6">
+              {showCart ? (
+                <div className="animate-fade-in">
+                  {/* Cart content */}
+                  <div className="flex items-center mb-6">
+                      <Button 
+                        variant="ghost" 
+                        className="mr-2"
+                        onClick={() => setShowCart(false)}
+                      >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back to Shopping
+                      </Button>
+                      <h2 className="text-2xl font-semibold">Your Cart</h2>
+                    </div>
+                
+                    {cart.length > 0 ? (
+                      <div>
+                        {cart.map(item => (
                       <Card key={item.id} className="mb-4">
                         <CardContent className="p-4">
                           <div className="flex items-center">
@@ -267,9 +377,9 @@ const Pharmacy = () => {
                               </Button>
                             </div>
                             <div className="text-right mr-4">
-                              <p className="font-semibold">${((item.medication.discountPrice || item.medication.price) * item.quantity).toFixed(2)}</p>
+                              <p className="font-semibold">₵{((item.medication.discountPrice || item.medication.price) * item.quantity).toFixed(2)}</p>
                               {item.medication.discountPrice && (
-                                <p className="text-sm text-gray-500 line-through">${(item.medication.price * item.quantity).toFixed(2)}</p>
+                                <p className="text-sm text-gray-500 line-through">₵{(item.medication.price * item.quantity).toFixed(2)}</p>
                               )}
                             </div>
                             <Button 
@@ -285,40 +395,45 @@ const Pharmacy = () => {
                       </Card>
                     ))}
                     
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                      <div className="flex justify-between mb-2">
-                        <span>Subtotal</span>
-                        <span>${calculateTotal().toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between mb-2 text-sm text-gray-600">
-                        <span>Shipping</span>
-                        <span>$5.99</span>
-                      </div>
-                      <div className="flex justify-between mb-2 text-sm text-gray-600">
-                        <span>Tax</span>
-                        <span>${(calculateTotal() * 0.07).toFixed(2)}</span>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="flex justify-between font-semibold">
-                        <span>Total</span>
-                        <span>${(calculateTotal() + 5.99 + (calculateTotal() * 0.07)).toFixed(2)}</span>
+                    <div className="mt-6 p-6 bg-gray-50 rounded-xl shadow-sm">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Subtotal</span>
+                          <span className="font-medium">₵{calculateTotal().toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-500">Shipping</span>
+                          <span className="font-medium">₵5.99</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-500">Tax (7%)</span>
+                          <span className="font-medium">₵{(calculateTotal() * 0.07).toFixed(2)}</span>
+                        </div>
+                        <Separator className="my-3" />
+                        <div className="flex justify-between items-center text-lg font-semibold">
+                          <span>Total</span>
+                          <span className="text-blue-600">₵{(calculateTotal() + 5.99 + (calculateTotal() * 0.07)).toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
                     
                     <div className="mt-6 flex justify-end">
-                      <Button className="bg-blue-500 hover:bg-blue-600 text-white">
+                      <Button 
+                        className="bg-blue-500 hover:bg-blue-600 text-white"
+                        onClick={handleCheckout}
+                      >
                         Proceed to Checkout
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-16">
-                    <ShoppingCart className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Your cart is empty</h3>
-                    <p className="text-gray-500 mb-6">Add medications or health products to get started</p>
+                  <div className="text-center py-20 px-6 bg-gray-50 rounded-xl">
+                    <ShoppingCart className="h-20 w-20 mx-auto text-gray-300 mb-6" />
+                    <h3 className="text-2xl font-semibold text-gray-700 mb-3">Your cart is empty</h3>
+                    <p className="text-gray-500 mb-8 max-w-sm mx-auto">Browse our wide selection of medications and health products to get started</p>
                     <Button 
                       onClick={() => setShowCart(false)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white"
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 rounded-full shadow-sm"
                     >
                       Browse Products
                     </Button>
@@ -365,18 +480,18 @@ const Pharmacy = () => {
                   </Tabs>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-6">
-                  <div className="w-full sm:w-56 shrink-0">
-                    <div className="p-4 bg-white rounded-lg shadow-sm">
-                      <h3 className="font-semibold mb-3">Categories</h3>
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="w-full lg:w-64 shrink-0">
+                    <div className="sticky top-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100">
+                      <h3 className="font-semibold text-lg mb-4">Categories</h3>
                       <div className="space-y-2">
                         {categories.map(category => (
                           <div 
                             key={category.id} 
-                            className={`px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                            className={`px-4 py-2.5 rounded-lg cursor-pointer transition-all hover:shadow-sm ${
                               categoryFilter === category.id 
-                                ? 'bg-blue-100 text-blue-600 font-medium' 
-                                : 'hover:bg-gray-100'
+                                ? 'bg-blue-50 text-blue-600 font-medium shadow-sm' 
+                                : 'hover:bg-gray-50'
                             }`}
                             onClick={() => setCategoryFilter(category.id)}
                           >
@@ -388,66 +503,72 @@ const Pharmacy = () => {
                   </div>
                   
                   <div className="flex-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {filteredMedications.length > 0 ? (
                         filteredMedications.map(medication => (
-                          <Card key={medication.id} className="overflow-hidden">
-                            <div className="h-40 bg-gray-100 relative flex items-center justify-center">
-                              <Pill className="h-16 w-16 text-blue-500/30" />
+                          <Card key={medication.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                            <div className="h-48 bg-gray-50 relative flex items-center justify-center">
+                              <Pill className="h-20 w-20 text-blue-500/40" />
                               {!medication.inStock && (
-                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
                                   <span className="text-white font-medium">Out of Stock</span>
                                 </div>
                               )}
                               {medication.discountPrice && (
-                                <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                                  Save ${(medication.price - medication.discountPrice).toFixed(2)}
+                                <div className="absolute top-3 left-3 bg-red-500 text-white text-xs px-3 py-1.5 rounded-full font-medium">
+                                  Save ₵{(medication.price - medication.discountPrice).toFixed(2)}
                                 </div>
                               )}
                             </div>
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-semibold text-lg">{medication.name}</h3>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-gray-400 hover:text-red-500"
-                                >
-                                  <Heart className="h-5 w-5" />
-                                </Button>
-                              </div>
-                              <p className="text-sm text-gray-600 mb-1">{medication.generic}</p>
-                              <p className="text-sm text-gray-600 mb-3">{medication.dosage} {medication.dosageForm}</p>
-                              
-                              <div className="mb-3">
-                                {medication.requiresPrescription ? (
-                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                    Prescription Required
-                                  </Badge>
-                                ) : (
-                                  renderStarRating(medication.rating)
-                                )}
-                              </div>
-                              
-                              <div className="flex justify-between items-center mt-4">
-                                <div>
-                                  {medication.discountPrice ? (
-                                    <div>
-                                      <span className="text-lg font-semibold">${medication.discountPrice.toFixed(2)}</span>
-                                      <span className="text-sm text-gray-500 line-through ml-2">${medication.price.toFixed(2)}</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-lg font-semibold">${medication.price.toFixed(2)}</span>
-                                  )}
+                            <CardContent className="p-5">
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h3 className="font-semibold text-lg leading-tight mb-1">{medication.name}</h3>
+                                    <p className="text-sm text-gray-600">{medication.generic}</p>
+                                  </div>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-gray-400 hover:text-red-500 -mt-1"
+                                  >
+                                    <Heart className="h-5 w-5" />
+                                  </Button>
                                 </div>
                                 
-                                <Button 
-                                  className="bg-blue-500 hover:bg-blue-600 text-white"
-                                  disabled={!medication.inStock || medication.requiresPrescription}
-                                  onClick={() => addToCart(medication)}
-                                >
-                                  {medication.requiresPrescription ? 'View Prescription' : 'Add to Cart'}
-                                </Button>
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm text-gray-600">{medication.dosage} {medication.dosageForm}</p>
+                                  {medication.requiresPrescription ? (
+                                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 whitespace-nowrap">
+                                      Prescription Required
+                                    </Badge>
+                                  ) : (
+                                    <div className="flex-shrink-0">{renderStarRating(medication.rating)}</div>
+                                  )}
+                                </div>
+                              
+                              <div className="pt-4 mt-3 border-t">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    {medication.discountPrice ? (
+                                      <div className="flex items-baseline gap-2">
+                                        <span className="text-xl font-semibold text-blue-600">₵{medication.discountPrice.toFixed(2)}</span>
+                                        <span className="text-sm text-gray-400 line-through">₵{medication.price.toFixed(2)}</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xl font-semibold text-blue-600">₵{medication.price.toFixed(2)}</span>
+                                    )}
+                                  </div>
+                                  
+                                  <Button 
+                                    className="bg-blue-500 hover:bg-blue-600 text-white shadow-sm"
+                                    disabled={!medication.inStock || medication.requiresPrescription}
+                                    onClick={() => addToCart(medication)}
+                                  >
+                                    {medication.requiresPrescription ? 'View Prescription' : 'Add to Cart'}
+                                  </Button>
+                              </div>
+                              </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -478,9 +599,11 @@ const Pharmacy = () => {
             )}
           </div>
         </div>
-      </div>
-    </div>
+        </div> 
+    )}</div>
   );
-};
+}
+  
 
-export default Pharmacy; 
+
+export default PharmacyComponent;

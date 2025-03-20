@@ -28,7 +28,7 @@ const DoctorDashboard = () => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Doctor Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {user?.displayName}</p>
+            <p className="text-gray-600">Hi, {user?.displayName}</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -79,6 +79,7 @@ const DoctorMessages = () => {
   // Load messages for a conversation
   const loadMessages = async (userId, partnerId) => {
     try {
+      // Initial load of messages
       const conversationMessages = await messageService.getMessages(userId, partnerId);
       setMessages(conversationMessages);
     } catch (error) {
@@ -91,10 +92,25 @@ const DoctorMessages = () => {
     }
   };
   
-  // Effect to load messages when selected conversation changes
+  // Effect to subscribe to messages when selected conversation changes
   useEffect(() => {
     if (user && selectedConversation) {
+      // Initial load
       loadMessages(user.id, selectedConversation.id);
+      
+      // Set up real-time subscription
+      const unsubscribe = messageService.subscribeToMessages(
+        user.id,
+        selectedConversation.id,
+        (updatedMessages) => {
+          setMessages(updatedMessages);
+        }
+      );
+      
+      // Clean up subscription when conversation changes or component unmounts
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
   }, [selectedConversation, user]);
   
@@ -394,7 +410,7 @@ const DoctorMessages = () => {
                     {messages.map((message) => (
                       <div key={message.id} className={`flex ${message.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] rounded-lg p-3 ${message.senderId === user.id ? 'bg-medisync-primary text-white' : 'bg-gray-100 text-gray-800'}`}>
-                          <p>{message.text}</p>
+                          <p>{message.content}</p>
                           <p className="text-xs mt-1 opacity-70">{message.timestamp}</p>
                         </div>
                       </div>

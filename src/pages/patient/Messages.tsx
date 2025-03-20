@@ -71,6 +71,7 @@ const PatientMessages = () => {
   // Load messages for a conversation
   const loadMessages = async (userId, partnerId) => {
     try {
+      // Initial load of messages
       const conversationMessages = await messageService.getMessages(userId, partnerId);
       setMessages(conversationMessages);
     } catch (error) {
@@ -83,11 +84,25 @@ const PatientMessages = () => {
     }
   };
   
-  // Effect to load messages when selected conversation changes
+  // Effect to subscribe to messages when selected conversation changes
   useEffect(() => {
     if (user && selectedConversation) {
+      // Initial load
       loadMessages(user.id, selectedConversation.id);
-     
+      
+      // Set up real-time subscription
+      const unsubscribe = messageService.subscribeToMessages(
+        user.id,
+        selectedConversation.id,
+        (updatedMessages) => {
+          setMessages(updatedMessages);
+        }
+      );
+      
+      // Clean up subscription when conversation changes or component unmounts
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
   }, [selectedConversation, user]);
   

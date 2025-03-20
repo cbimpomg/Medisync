@@ -43,7 +43,8 @@ export const collections = {
     tasks: 'tasks',
     medications: 'medications',
     reports: 'reports',
-    billing: 'billing'
+    billing: 'billing',
+    symptomAssessments: 'symptomAssessments'
 } as const;
 
 // Database schema types
@@ -53,6 +54,9 @@ export interface User {
     role: 'admin' | 'doctor' | 'nurse' | 'patient';
     displayName: string;
     photoURL?: string;
+    age?: number;
+    gender?: string;
+    medicalHistory?: string[];
     createdAt: Date;
     updatedAt: Date;
 }

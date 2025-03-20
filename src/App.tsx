@@ -21,6 +21,8 @@ import Telehealth from "./pages/patient/Telehealth";
 import MedicalRecords from "./pages/patient/MedicalRecords";
 import Prescriptions from "./pages/patient/Prescriptions";
 import Pharmacy from "./pages/patient/Pharmacy";
+import Checkout from "./pages/patient/Checkout";
+import PaymentVerification from "./pages/patient/payment/verify";
 
 // Doctor pages
 import DoctorDashboard from "./pages/doctor/Dashboard";
@@ -78,6 +80,8 @@ const App = () => {
               <Route path="/medical-records" element={<MedicalRecords />} />
               <Route path="/prescriptions" element={<Prescriptions />} />
               <Route path="/pharmacy" element={<Pharmacy />} />
+              <Route path="/patient/checkout" element={<Checkout cartItems={window.history.state?.cartItems || []} />} />
+              <Route path="/patient/payment/verify" element={<PaymentVerification />} />
               
               {/* Doctor Routes */}
               <Route path="/doctor/dashboard" element={<DoctorDashboard />} />

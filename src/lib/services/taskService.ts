@@ -1,16 +1,17 @@
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, collections, User } from '../firebase';
+import { taskApi } from '../api/taskApi';
 
 // Task interface
 export interface Task {
   id: string;
   title: string;
   patientId: string;
-  assignedTo: string; // User ID of the nurse assigned to the task
-  assignedBy: string; // User ID of the person who assigned the task
+  assignedTo: string;
+  assignedBy: string;
   priority: 'High' | 'Medium' | 'Low';
   status: 'Pending' | 'In Progress' | 'Completed' | 'Cancelled';
-  category: string; // e.g., 'Medication', 'Wound Care', 'Monitoring', etc.
+  category: string;
   dueDate: Date;
   dueTime: string;
   description: string;
@@ -19,6 +20,7 @@ export interface Task {
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
+  patientName?: string;
 }
 
 /**
@@ -31,58 +33,34 @@ export const taskService = {
    * @param status - Optional status filter
    * @returns Array of tasks
    */
-  async getNurseTasks(nurseId: string, status?: Task['status']) {
-    try {
-      let tasksQuery;
-      
-      if (status) {
-        tasksQuery = query(
-          collection(db, collections.tasks),
-          where('assignedTo', '==', nurseId),
-          where('status', '==', status),
-          orderBy('dueDate', 'asc')
-        );
-      } else {
-        tasksQuery = query(
-          collection(db, collections.tasks),
-          where('assignedTo', '==', nurseId),
-          orderBy('dueDate', 'asc')
-        );
-      }
+  subscribeToNurseTasks: (nurseId: string, onUpdate: (tasks: Task[]) => void) => {
+    const tasksQuery = query(
+      collection(db, collections.tasks),
+      where('assignedTo', '==', nurseId),
+      orderBy('dueDate', 'asc')
+    );
 
-      const tasksSnapshot = await getDocs(tasksQuery);
-      const tasks: Array<Task & {
-        patientName: string;
-        assignedByName: string;
-      }> = [];
+    return onSnapshot(tasksQuery, async (snapshot) => {
+      const tasks = await Promise.all(
+        snapshot.docs.map(async (docSnapshot) => {
+          const taskData = docSnapshot.data() as Task;
+          if (!taskData) return null;
 
-      for (const docSnapshot of tasksSnapshot.docs) {
-        const taskData = docSnapshot.data() as Task;
-        
-        // Get patient details
-        const patientDoc = await getDoc(doc(db, collections.users, taskData.patientId));
-        const patientData = patientDoc.exists() ? patientDoc.data() as User : null;
-        
-        // Get assigner details
-        const assignerDoc = await getDoc(doc(db, collections.users, taskData.assignedBy));
-        const assignerData = assignerDoc.exists() ? assignerDoc.data() as User : null;
-        
-        tasks.push({
-          id: docSnapshot.id,
-          ...taskData,
-          patientName: patientData?.displayName || 'Unknown Patient',
-          assignedByName: assignerData?.displayName || 'Unknown',
-          dueDate: taskData.dueDate instanceof Timestamp ? 
-            taskData.dueDate.toDate() : 
-            new Date(taskData.dueDate),
-        });
-      }
+          const patientDoc = await getDoc(doc(db, collections.users, taskData.patientId));
+          const patientData = patientDoc.exists() ? patientDoc.data() as User : null;
 
-      return tasks;
-    } catch (error) {
-      console.error('Error getting nurse tasks:', error);
-      throw error;
-    }
+          return {
+            id: docSnapshot.id,
+            ...taskData,
+            patientName: patientData?.displayName || 'Unknown Patient',
+            dueDate: taskData.dueDate instanceof Timestamp ?
+              taskData.dueDate.toDate() :
+              new Date(taskData.dueDate),
+          };
+        })
+      ).then(tasks => tasks.filter((task): task is Task & { patientName: string } => task !== null));
+      onUpdate(tasks);
+    });
   },
 
   /**
@@ -90,86 +68,38 @@ export const taskService = {
    * @param patientId - The patient's ID
    * @returns Array of tasks
    */
-  async getPatientTasks(patientId: string) {
-    try {
-      const tasksQuery = query(
-        collection(db, collections.tasks),
-        where('patientId', '==', patientId),
-        orderBy('dueDate', 'asc')
-      );
-
-      const tasksSnapshot = await getDocs(tasksQuery);
-      const tasks: Array<Task & {
-        nurseName: string;
-        assignedByName: string;
-      }> = [];
-
-      for (const docSnapshot of tasksSnapshot.docs) {
-        const taskData = docSnapshot.data() as Task;
-        
-        // Get nurse details
-        const nurseDoc = await getDoc(doc(db, collections.users, taskData.assignedTo));
-        const nurseData = nurseDoc.exists() ? nurseDoc.data() as User : null;
-        
-        // Get assigner details
-        const assignerDoc = await getDoc(doc(db, collections.users, taskData.assignedBy));
-        const assignerData = assignerDoc.exists() ? assignerDoc.data() as User : null;
-        
-        tasks.push({
-          id: docSnapshot.id,
-          ...taskData,
-          nurseName: nurseData?.displayName || 'Unknown Nurse',
-          assignedByName: assignerData?.displayName || 'Unknown',
-          dueDate: taskData.dueDate instanceof Timestamp ? 
-            taskData.dueDate.toDate() : 
-            new Date(taskData.dueDate),
-        });
-      }
-
-      return tasks;
-    } catch (error) {
-      console.error('Error getting patient tasks:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get all tasks (for administrators or charge nurses)
-   * @param status - Optional status filter
-   * @param date - Optional date filter
-   * @returns Array of tasks
-   */
-  async getAllTasks(status?: Task['status'], date?: Date) {
+  // Get all tasks with pagination and filters
+  getAllTasks: async (filters?: { status?: Task['status']; date?: Date }) => {
     try {
       let tasksQuery;
       
-      if (status && date) {
+      if (filters?.status && filters?.date) {
         // Create date range for the specified date (start of day to end of day)
-        const startDate = new Date(date);
+        const startDate = new Date(filters.date);
         startDate.setHours(0, 0, 0, 0);
         
-        const endDate = new Date(date);
+        const endDate = new Date(filters.date);
         endDate.setHours(23, 59, 59, 999);
         
         tasksQuery = query(
           collection(db, collections.tasks),
-          where('status', '==', status),
+          where('status', '==', filters.status),
           where('dueDate', '>=', startDate),
           where('dueDate', '<=', endDate),
           orderBy('dueDate', 'asc')
         );
-      } else if (status) {
+      } else if (filters?.status) {
         tasksQuery = query(
           collection(db, collections.tasks),
-          where('status', '==', status),
+          where('status', '==', filters.status),
           orderBy('dueDate', 'asc')
         );
-      } else if (date) {
+      } else if (filters?.date) {
         // Create date range for the specified date
-        const startDate = new Date(date);
+        const startDate = new Date(filters.date);
         startDate.setHours(0, 0, 0, 0);
         
-        const endDate = new Date(date);
+        const endDate = new Date(filters.date);
         endDate.setHours(23, 59, 59, 999);
         
         tasksQuery = query(
@@ -226,12 +156,12 @@ export const taskService = {
     }
   },
 
-  /**
-   * Get a specific task by ID
-   * @param taskId - The task ID
-   * @returns The task data or null if not found
-   */
-  async getTaskById(taskId: string) {
+  // Get a specific task by ID
+  getTaskById: async (taskId: string): Promise<(Task & {
+    patientName: string;
+    nurseName: string;
+    assignedByName: string;
+  }) | null> => {
     try {
       const taskDoc = await getDoc(doc(db, collections.tasks, taskId));
       
@@ -253,6 +183,8 @@ export const taskService = {
       const assignerDoc = await getDoc(doc(db, collections.users, taskData.assignedBy));
       const assignerData = assignerDoc.exists() ? assignerDoc.data() as User : null;
       
+      if (!taskData) return null;
+      
       return {
         id: taskDoc.id,
         ...taskData,
@@ -269,12 +201,8 @@ export const taskService = {
     }
   },
 
-  /**
-   * Create a new task
-   * @param taskData - The task data
-   * @returns The created task
-   */
-  async createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) {
+  // Create a new task
+  createTask: async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> => {
     try {
       const newTask = {
         ...taskData,
@@ -289,20 +217,15 @@ export const taskService = {
         ...newTask,
         createdAt: new Date(),
         updatedAt: new Date()
-      };
+      } as Task;
     } catch (error) {
       console.error('Error creating task:', error);
       throw error;
     }
   },
 
-  /**
-   * Update an existing task
-   * @param taskId - The task ID
-   * @param taskData - The task data to update
-   * @returns Promise that resolves when the operation is complete
-   */
-  async updateTask(taskId: string, taskData: Partial<Task>) {
+  // Update task status or add notes
+  updateTask: async (taskId: string, taskData: Partial<Task>): Promise<Task | null> => {
     try {
       const taskRef = doc(db, collections.tasks, taskId);
       
@@ -311,19 +234,15 @@ export const taskService = {
         updatedAt: serverTimestamp()
       });
       
-      return this.getTaskById(taskId);
+      return taskService.getTaskById(taskId);
     } catch (error) {
       console.error('Error updating task:', error);
       throw error;
     }
   },
 
-  /**
-   * Delete a task
-   * @param taskId - The task ID
-   * @returns Promise that resolves when the operation is complete
-   */
-  async deleteTask(taskId: string) {
+  // Delete a task
+  deleteTask: async (taskId: string): Promise<void> => {
     try {
       await deleteDoc(doc(db, collections.tasks, taskId));
     } catch (error) {
@@ -339,7 +258,7 @@ export const taskService = {
    * @param completedAt - Optional timestamp for when the task was completed
    * @returns The updated task
    */
-  async updateTaskStatus(taskId: string, status: Task['status'], completedAt?: Date) {
+  updateTaskStatus: async (taskId: string, status: Task['status'], completedAt?: Date): Promise<Task | null> => {
     try {
       const updateData: Partial<Task> = { status };
       
@@ -349,7 +268,7 @@ export const taskService = {
         updateData.completedAt = completedAt;
       }
       
-      return this.updateTask(taskId, updateData);
+      return taskService.updateTask(taskId, updateData);
     } catch (error) {
       console.error('Error updating task status:', error);
       throw error;
@@ -362,12 +281,14 @@ export const taskService = {
    * @param nurseId - The new nurse's ID
    * @returns The updated task
    */
-  async reassignTask(taskId: string, nurseId: string) {
+  reassignTask: async (taskId: string, nurseId: string): Promise<Task | null> => {
     try {
-      return this.updateTask(taskId, { assignedTo: nurseId });
+      return taskService.updateTask(taskId, { assignedTo: nurseId });
     } catch (error) {
       console.error('Error reassigning task:', error);
       throw error;
     }
   }
+
+
 };
