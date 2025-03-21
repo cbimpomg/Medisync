@@ -12,10 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Invoice from '@/components/pharmacy/Invoice';
 import { paystackService } from '@/lib/services/paystackService';
- import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
+import { medicationService } from '@/lib/services/medicationService';
 
 interface Medication {
-  id: string;
+  id?: string;
   name: string;
   generic: string;
   description: string;
@@ -25,10 +26,13 @@ interface Medication {
   imageUrl: string;
   requiresPrescription: boolean;
   inStock: boolean;
+  stockQuantity: number;
   rating: number;
   reviews: number;
   dosage: string;
   dosageForm: string;
+  manufacturer: string;
+  expiryDate: Date;
 }
 
 interface CartItem {
@@ -38,8 +42,6 @@ interface CartItem {
 }
 
 const PharmacyComponent = () => {
-  const { toast } = useToast();
-
   return (
     <div className="flex h-screen overflow-hidden">
       <PatientSidebar />
@@ -53,6 +55,7 @@ const PharmacyComponent = () => {
 const PharmacyContent = () => {
   const { toast } = useToast();
   const location = useLocation();
+  const [medications, setMedications] = useState<Medication[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -61,6 +64,25 @@ const PharmacyContent = () => {
   const [showInvoice, setShowInvoice] = useState(false);
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const prescribedMed = location.state?.prescribedMedication;
+    if (prescribedMed) {
+      const medication = medications.find(med => 
+        med.name.toLowerCase() === prescribedMed.name.toLowerCase() && 
+        med.dosage === prescribedMed.dosage
+      );
+      
+      if (medication) {
+        setCart([{ id: medication.id || '', medication, quantity: prescribedMed.quantity }]);
+        setShowCart(true);
+        toast({
+          title: "Prescription Added",
+          description: `${medication.name} has been added to your cart.`
+        });
+      }
+    }
+  }, [location.state, medications, toast]);
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -142,70 +164,13 @@ const PharmacyContent = () => {
     }
   };
 
-  // Mock medication data
-  const medications: Medication[] = [
-    {
-      id: '1',
-      name: 'Tylenol Extra Strength',
-      generic: 'Acetaminophen',
-      description: 'Pain reliever and fever reducer.',
-      price: 8.99,
-      category: 'pain-relief',
-      imageUrl: '/images/placeholder.svg',
-      requiresPrescription: false,
-      inStock: true,
-      rating: 4.5,
-      reviews: 128,
-      dosage: '500mg',
-      dosageForm: 'Tablet'
-    },
-    {
-      id: '2',
-      name: 'Advil',
-      generic: 'Ibuprofen',
-      description: 'Relieves minor aches and pains.',
-      price: 9.99,
-      discountPrice: 7.99,
-      category: 'pain-relief',
-      imageUrl: '/images/placeholder.svg',
-      requiresPrescription: false,
-      inStock: true,
-      rating: 4.7,
-      reviews: 95,
-      dosage: '200mg',
-      dosageForm: 'Caplet'
-    },
-    {
-      id: '3',
-      name: 'Zyrtec',
-      generic: 'Cetirizine',
-      description: '24-hour allergy relief.',
-      price: 24.99,
-      category: 'allergy',
-      imageUrl: '/images/placeholder.svg',
-      requiresPrescription: false,
-      inStock: true,
-      rating: 4.8,
-      reviews: 76,
-      dosage: '10mg',
-      dosageForm: 'Tablet'
-    },
-    {
-      id: '4',
-      name: 'Lipitor',
-      generic: 'Atorvastatin',
-      description: 'Cholesterol management medication.',
-      price: 58.99,
-      category: 'prescription',
-      imageUrl: '/images/placeholder.svg',
-      requiresPrescription: true,
-      inStock: true,
-      rating: 4.6,
-      reviews: 205,
-      dosage: '20mg',
-      dosageForm: 'Tablet'
-    }
-  ];
+  useEffect(() => {
+    const unsubscribe = medicationService.subscribeToMedications((updatedMedications) => {
+      setMedications(updatedMedications);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Filter medications based on search and category
   const filteredMedications = medications.filter(medication => {
@@ -236,7 +201,7 @@ const PharmacyContent = () => {
   ];
 
   const addToCart = (medication: Medication) => {
-    if (medication.requiresPrescription) {
+    if (medication.requiresPrescription && !location.state?.prescribedMedication) {
       toast({
         title: "Prescription Required",
         description: "Please check your prescriptions section.",
@@ -598,12 +563,11 @@ const PharmacyContent = () => {
               </>
             )}
           </div>
+          </div>
         </div>
-        </div> 
-    )}</div>
+      )}
+    </div>
   );
 }
-  
-
 
 export default PharmacyComponent;

@@ -1,9 +1,20 @@
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, collections, User } from '../firebase';
 
 /**
  * User Service - Handles all user-related operations with Firestore
  */
+interface Notification {
+  userId: string;
+  type: 'prescription' | 'appointment' | 'message';
+  title: string;
+  message: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: Record<string, any>;
+  read?: boolean;
+  createdAt?: Date;
+}
+
 export const userService = {
   /**
    * Get a user by their ID
@@ -107,6 +118,33 @@ export const userService = {
       );
     } catch (error) {
       console.error('Error searching users:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Send a notification to a user
+   * @param userId - The user's ID
+   * @param notification - The notification data
+   * @returns The created notification
+   */
+  async sendNotification(userId: string, notification: Omit<Notification, 'userId' | 'createdAt' | 'read'>): Promise<Notification> {
+    try {
+      const newNotification = {
+        userId,
+        ...notification,
+        read: false,
+        createdAt: serverTimestamp()
+      };
+
+      const docRef = await addDoc(collection(db, collections.notifications), newNotification);
+      
+      return {
+        ...newNotification,
+        createdAt: new Date()
+      };
+    } catch (error) {
+      console.error('Error sending notification:', error);
       throw error;
     }
   }

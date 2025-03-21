@@ -52,6 +52,7 @@ import AdminAppointments from "./pages/admin/Appointments";
 import AdminReports from "./pages/admin/Reports";
 import AdminBilling from "./pages/admin/Billing";
 import AdminSettings from "./pages/admin/Settings";
+import PharmacyAdmin from "./pages/admin/Pharmacy";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ const App = () => {
               <Route path="/admin/reports" element={<AdminReports />} />
               <Route path="/admin/billing" element={<AdminBilling />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/pharmacy" element={<PharmacyAdmin />} />
               
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, Clock, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import { Button } from "@/components/ui/button";
@@ -9,53 +9,50 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-
-// Mock appointment data
-const appointments = [
-  {
-    id: 1,
-    patientName: "Ransford Agyei",
-    patientId: "P001",
-    date: "2024-03-20",
-    time: "09:00 AM",
-    type: "General Checkup",
-    status: "Scheduled",
-    notes: "Regular health checkup"
-  },
-  {
-    id: 2,
-    patientName: "Emma Johnson",
-    patientId: "P002",
-    date: "2024-03-20",
-    time: "10:30 AM",
-    type: "Follow-up",
-    status: "Completed",
-    notes: "Post-surgery follow-up"
-  },
-  {
-    id: 3,
-    patientName: "Michael Chen",
-    patientId: "P003",
-    date: "2024-03-20",
-    time: "11:45 AM",
-    type: "New Patient",
-    status: "Cancelled",
-    notes: "Initial consultation"
-  }
-];
+import { useAuth } from '@/hooks/useAuth';
+import { appointmentService } from '@/lib/services/appointmentService';
+import { Appointment } from '@/lib/firebase';
 
 const DoctorAppointments = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<'calendar' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!user?.uid) return;
+      
+      try {
+        setIsLoading(true);
+        const fetchedAppointments = date
+          ? await appointmentService.getAppointmentsByDate(date, user.uid, 'doctor')
+          : await appointmentService.getAppointments(user.uid, 'doctor');
+        
+        if (fetchedAppointments.length === 0) {
+          console.log('No appointments found for doctor:', user.uid);
+        }
+        
+        setAppointments(fetchedAppointments);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [user?.uid, date]);
 
   const filteredAppointments = appointments.filter(appointment => {
-    const matchesSearch = appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         appointment.patientId.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || appointment.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
+
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -162,35 +159,45 @@ const DoctorAppointments = () => {
             <div className="lg:col-span-3">
               <Card>
                 <CardContent className="p-6">
-                  {view === 'list' ? (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    </div>
+                  ) : view === 'list' ? (
                     <div className="space-y-4">
-                      {filteredAppointments.map((appointment) => (
-                        <div 
-                          key={appointment.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                              <span className="text-blue-600 font-medium">{appointment.patientName.charAt(0)}</span>
-                            </div>
-                            <div>
-                              <h3 className="font-medium">{appointment.patientName}</h3>
-                              <p className="text-sm text-gray-500">Patient ID: {appointment.patientId}</p>
-                              <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                                <Clock className="h-4 w-4" />
-                                {appointment.time} - {appointment.type}
+                      {filteredAppointments.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">No appointments found</p>
+                        </div>
+                      ) : (
+                        filteredAppointments.map((appointment) => (
+                          <div 
+                            key={appointment.id}
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span className="text-blue-600 font-medium">{appointment.patientName.charAt(0)}</span>
+                              </div>
+                              <div>
+                                <h3 className="font-medium">{appointment.patientName}</h3>
+                                <p className="text-sm text-gray-500">Patient ID: {appointment.patientId}</p>
+                                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                  <Clock className="h-4 w-4" />
+                                  {appointment.time} - {appointment.type}
+                                </div>
                               </div>
                             </div>
+                            
+                            <div className="flex items-center gap-3">
+                              <Badge className={getStatusColor(appointment.status)}>
+                                {appointment.status}
+                              </Badge>
+                              <Button variant="outline" size="sm">View Details</Button>
+                            </div>
                           </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <Badge className={getStatusColor(appointment.status)}>
-                              {appointment.status}
-                            </Badge>
-                            <Button variant="outline" size="sm">View Details</Button>
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-12">
@@ -207,4 +214,4 @@ const DoctorAppointments = () => {
   );
 };
 
-export default DoctorAppointments; 
+export default DoctorAppointments;

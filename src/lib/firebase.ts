@@ -44,11 +44,14 @@ export const collections = {
     medications: 'medications',
     reports: 'reports',
     billing: 'billing',
-    symptomAssessments: 'symptomAssessments'
+    symptomAssessments: 'symptomAssessments',
+    notifications: 'notifications'
 } as const;
 
 // Database schema types
 export interface User {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [x: string]: any;
     uid: string;
     email: string;
     role: 'admin' | 'doctor' | 'nurse' | 'patient';
@@ -89,6 +92,7 @@ export interface Patient extends User {
 export interface Appointment {
   id: string;
   patientId: string;
+  patientName: string;
   doctorId: string;
   date: Date;
   time: string;

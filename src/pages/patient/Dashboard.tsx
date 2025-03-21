@@ -43,7 +43,7 @@ const PatientDashboard = () => {
         
         <div className="p-6 flex-1 overflow-y-auto relative z-10">
           <div className="mb-6 animate-fade-in">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">Hi, {user?.displayName}</h1>
+            <h1 className="text-3xl font-bold text-black drop-shadow-lg shadow-black">Hi, {user?.displayName}</h1>
           </div>
           
           <div className="mb-8 animate-slide-up">

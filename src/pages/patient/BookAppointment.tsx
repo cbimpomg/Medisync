@@ -248,6 +248,7 @@ const BookAppointment = () => {
 
         await appointmentService.createAppointment({
           patientId: user.uid,
+          patientName: user.displayName || 'Unknown Patient',
           doctorId: selectedDoctor,
           date: appointmentDate,
           time: selectedTime,
@@ -299,7 +300,7 @@ const BookAppointment = () => {
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="p-6 flex-1 overflow-y-auto relative z-10">
           <div className="mb-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg shadow-black">Book an Appointment</h1>
+            <h1 className="text-3xl font-bold text-black drop-shadow-lg shadow-black">Book an Appointment</h1>
           </div>
           
           <div className="mb-8 bg-white/85 rounded-xl shadow-xl p-6">

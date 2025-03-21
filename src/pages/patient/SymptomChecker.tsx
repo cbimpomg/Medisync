@@ -146,7 +146,7 @@ const SymptomChecker = () => {
         description: "Your symptoms have been analyzed.",
         variant: "default"
       });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     } catch (error: any) {
       console.error('Error processing symptoms:', error);
       

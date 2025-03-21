@@ -9,7 +9,8 @@ import {
   CreditCard,
   Settings,
   LogOut,
-  User
+  User,
+  Pill
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,6 +28,7 @@ const AdminSidebar = () => {
     { icon: Users, label: 'Patients', path: '/admin/patients' },
     { icon: UserCog, label: 'Doctors', path: '/admin/doctors' },
     { icon: CalendarClock, label: 'Appointments', path: '/admin/appointments' },
+    { icon: Pill, label: 'Pharmacy', path: '/admin/pharmacy' },
     { icon: FileBarChart, label: 'Report', path: '/admin/reports' },
     { icon: CreditCard, label: 'Billing', path: '/admin/billing' },
     { icon: Settings, label: 'Settings', path: '/admin/settings' },

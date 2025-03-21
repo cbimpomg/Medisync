@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db, collections, Appointment, User } from '../firebase';
 import { notificationService } from './notificationService';
+import { pushNotificationService } from './pushNotificationService';
 
 /**
  * Appointment Service - Handles all appointment-related operations with Firestore
@@ -20,8 +21,8 @@ export const appointmentService = {
         appointmentsQuery = query(
           collection(db, collections.appointments),
           where('doctorId', '==', userId),
-          where('status', 'in', ['scheduled', 'in-progress']),
-          orderBy('date', 'asc')
+          where('status', '!=', 'cancelled'),
+          orderBy('date', 'desc')
         );
       } else if (role === 'patient') {
         appointmentsQuery = query(
@@ -96,8 +97,8 @@ export const appointmentService = {
         appointmentsQuery = query(
           collection(db, collections.appointments),
           where('doctorId', '==', userId),
-          where('date', '>=', startDate),
-          where('date', '<=', endDate),
+          where('date', '>=', Timestamp.fromDate(startDate)),
+          where('date', '<=', Timestamp.fromDate(endDate)),
           orderBy('date', 'asc')
         );
       } else if (userId && role === 'patient') {
@@ -222,14 +223,16 @@ export const appointmentService = {
         date: appointmentData.date instanceof Timestamp ? appointmentData.date.toDate() : new Date(appointmentData.date),
         time: appointmentData.time,
         type: appointmentData.type,
-        status: appointmentData.status
+        status: 'scheduled',
       };
 
       // Create notification for managers
-      await notificationService.createAppointmentNotification(notificationData, 'manager');
+      const managerNotification = await notificationService.createAppointmentNotification(notificationData, 'manager');
+      await pushNotificationService.showNotification(managerNotification);
       
       // Create notification for the doctor
-      await notificationService.createAppointmentNotification(notificationData, 'doctor', appointmentData.doctorId);
+      const doctorNotification = await notificationService.createAppointmentNotification(notificationData, 'doctor', appointmentData.doctorId);
+      await pushNotificationService.showNotification(doctorNotification);
       
       return {
         id: docRef.id,

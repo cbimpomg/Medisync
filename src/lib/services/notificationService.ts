@@ -19,10 +19,14 @@ export interface AppointmentNotification {
 export const notificationService = {
   async createAppointmentNotification(notification: Omit<AppointmentNotification, 'id' | 'createdAt'>, recipientType: 'doctor' | 'manager' = 'manager', recipientId?: string) {
     try {
+      if (recipientType === 'doctor' && !recipientId) {
+        throw new Error('recipientId is required for doctor notifications');
+      }
+
       const newNotification = {
         ...notification,
         recipientType,
-        recipientId,
+        recipientId: recipientType === 'doctor' ? recipientId : null,
         isRead: false,
         createdAt: serverTimestamp()
       };
