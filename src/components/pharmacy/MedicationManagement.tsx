@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Timestamp } from 'firebase/firestore';
 import { medicationService } from '@/lib/services/medicationService';
+import { useToast } from "@/components/ui/use-toast";
 
 interface Medication {
   id?: string;
@@ -80,32 +81,43 @@ export function MedicationManagement() {
     return () => unsubscribe();
   }, []);
 
+  const { toast } = useToast();
+
   const onSubmit = async (values: z.infer<typeof medicationSchema>) => {
     try {
       const medicationData: Omit<Medication, 'id'> = {
-        ...values,
         name: values.name,
         generic: values.generic,
         description: values.description,
         price: values.price,
+        discountPrice: values.discountPrice,
         category: values.category,
-        dosage: values.dosage,
-        inStock: true,
-        rating: 0,
-        reviews: 0,
-        dosageForm: values.dosageForm,
-        manufacturer: values.manufacturer,
-        expiryDate: values.expiryDate,
         imageUrl: values.imageUrl,
         requiresPrescription: values.requiresPrescription,
+        inStock: true,
         stockQuantity: values.stockQuantity,
-        discountPrice: values.discountPrice
+        rating: 0,
+        reviews: 0,
+        dosage: values.dosage,
+        dosageForm: values.dosageForm,
+        manufacturer: values.manufacturer,
+        expiryDate: values.expiryDate
       };
+      
       await medicationService.addMedication(medicationData);
+      toast({
+        title: "Success",
+        description: "Medication added successfully"
+      });
       setIsAddDialogOpen(false);
       form.reset();
     } catch (error) {
       console.error('Error adding medication:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add medication. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -172,7 +184,7 @@ export function MedicationManagement() {
                     name="price"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price</FormLabel>
+                        <FormLabel>Price (₵)</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -190,7 +202,7 @@ export function MedicationManagement() {
                     name="discountPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Discount Price (Optional)</FormLabel>
+                        <FormLabel>Discount Price (₵)</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -379,12 +391,41 @@ export function MedicationManagement() {
             <TableRow key={medication.id}>
               <TableCell>{medication.name}</TableCell>
               <TableCell>{medication.category}</TableCell>
-              <TableCell>${medication.price}</TableCell>
+              <TableCell>₵{medication.price}</TableCell>
               <TableCell>{medication.stockQuantity}</TableCell>
               <TableCell>{medication.requiresPrescription ? "Yes" : "No"}</TableCell>
               <TableCell>
-                <Button variant="outline" className="mr-2">Edit</Button>
-                <Button variant="destructive">Delete</Button>
+                <Button 
+                  variant="outline" 
+                  className="mr-2"
+                  onClick={() => {
+                    form.reset(medication);
+                    setIsAddDialogOpen(true);
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={async () => {
+                    try {
+                      await medicationService.deleteMedication(medication.id!);
+                      toast({
+                        title: "Success",
+                        description: "Medication deleted successfully"
+                      });
+                    } catch (error) {
+                      console.error('Error deleting medication:', error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to delete medication",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
               </TableCell>
             </TableRow>
           ))}

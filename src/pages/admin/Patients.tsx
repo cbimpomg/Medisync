@@ -23,63 +23,46 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Mock patients data
-const patientsData = [
-  {
-    id: "P001",
-    name: "Ransford Agyei",
-    email: "ransford@example.com",
-    phone: "+1 234-567-8901",
-    dateOfBirth: "1990-05-15",
-    gender: "Male",
-    address: "123 Main St, City",
-    registrationDate: "2024-01-15",
-    status: "Active",
-    insuranceProvider: "Blue Cross",
-    insuranceNumber: "BC123456789"
-  },
-  {
-    id: "P002",
-    name: "Emma Johnson",
-    email: "emma@example.com",
-    phone: "+1 234-567-8902",
-    dateOfBirth: "1985-08-22",
-    gender: "Female",
-    address: "456 Oak Ave, Town",
-    registrationDate: "2024-02-01",
-    status: "Active",
-    insuranceProvider: "Aetna",
-    insuranceNumber: "AE987654321"
-  },
-  {
-    id: "P003",
-    name: "Michael Chen",
-    email: "michael@example.com",
-    phone: "+1 234-567-8903",
-    dateOfBirth: "1978-11-30",
-    gender: "Male",
-    address: "789 Pine Rd, Village",
-    registrationDate: "2024-02-15",
-    status: "Inactive",
-    insuranceProvider: "United",
-    insuranceNumber: "UN456789123"
-  }
-];
+import { useEffect } from 'react';
+import { patientService, Patient } from '@/lib/services/patientService';
 
 const AdminPatients = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [patientsData, setPatientsData] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        setIsLoading(true);
+        const patients = await patientService.getAllPatients();
+        setPatientsData(patients);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching patients:', err);
+        setError('Failed to load patients data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPatients();
+  }, []);
 
   const filteredPatients = patientsData.filter(patient => {
     const matchesSearch = 
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || patient.status.toLowerCase() === statusFilter.toLowerCase();
+      ((patient?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (patient?.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (patient?.id || '').toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus = statusFilter === 'all' || (patient?.status || '').toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status?: string) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
     switch (status.toLowerCase()) {
       case 'active':
         return 'bg-green-100 text-green-800';
@@ -89,6 +72,28 @@ const AdminPatients = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-gray-100">
+        <AdminSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen bg-gray-100">
+        <AdminSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-red-500">{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -326,4 +331,4 @@ const AdminPatients = () => {
   );
 };
 
-export default AdminPatients; 
+export default AdminPatients;

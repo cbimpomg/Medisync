@@ -24,72 +24,51 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-// Mock doctors data
-const doctorsData = [
-  {
-    id: "D001",
-    name: "Dr. Sarah Wilson",
-    email: "sarah.wilson@example.com",
-    phone: "+1 234-567-8901",
-    specialization: "Cardiology",
-    experience: "15 years",
-    status: "Active",
-    joinDate: "2020-01-15",
-    schedule: "Mon-Fri",
-    patients: 120,
-    rating: 4.8,
-    qualifications: "MD, FACC",
-    licenseNumber: "MED123456"
-  },
-  {
-    id: "D002",
-    name: "Dr. Michael Chang",
-    email: "michael.chang@example.com",
-    phone: "+1 234-567-8902",
-    specialization: "Orthopedics",
-    experience: "12 years",
-    status: "Active",
-    joinDate: "2021-03-01",
-    schedule: "Mon-Thu",
-    patients: 95,
-    rating: 4.7,
-    qualifications: "MD, FAAOS",
-    licenseNumber: "MED789012"
-  },
-  {
-    id: "D003",
-    name: "Dr. Lisa Brown",
-    email: "lisa.brown@example.com",
-    phone: "+1 234-567-8903",
-    specialization: "Pediatrics",
-    experience: "8 years",
-    status: "On Leave",
-    joinDate: "2022-06-15",
-    schedule: "Tue-Sat",
-    patients: 150,
-    rating: 4.9,
-    qualifications: "MD, FAAP",
-    licenseNumber: "MED345678"
-  }
-];
+import { useEffect } from 'react';
+import { doctorService } from '@/lib/services/doctorService';
+import { Doctor } from '@/lib/firebase';
 
 const AdminDoctors = () => {
+  // State for doctors data
+  const [doctorsData, setDoctorsData] = useState<(Doctor & {id: string})[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch doctors data
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setIsLoading(true);
+        const doctors = await doctorService.getAllActiveDoctors();
+        setDoctorsData(doctors);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching doctors:', err);
+        setError('Failed to load doctors data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDoctors();
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [specializationFilter, setSpecializationFilter] = useState('all');
 
   const filteredDoctors = doctorsData.filter(doctor => {
     const matchesSearch = 
-      doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doctor.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doctor.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || doctor.status.toLowerCase() === statusFilter.toLowerCase();
+      (doctor.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (doctor.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (doctor.id?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || (doctor.status?.toLowerCase() || '').includes(statusFilter.toLowerCase());
     const matchesSpecialization = specializationFilter === 'all' || doctor.specialization.toLowerCase() === specializationFilter.toLowerCase();
     return matchesSearch && matchesStatus && matchesSpecialization;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getStatusColor = (status: string = '') => {
+    switch (status?.toLowerCase() || '') {
       case 'active':
         return 'bg-green-100 text-green-800';
       case 'on leave':
@@ -106,7 +85,7 @@ const AdminDoctors = () => {
       <AdminSidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto h-full">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Doctors Management</h1>
@@ -224,7 +203,7 @@ const AdminDoctors = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {doctorsData.reduce((sum, doc) => sum + doc.patients, 0)}
+                  {doctorsData.reduce((sum, doc) => sum + (doc.patients || 0), 0)}
                 </div>
                 <p className="text-xs text-gray-500">Under care</p>
               </CardContent>
@@ -235,7 +214,7 @@ const AdminDoctors = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {(doctorsData.reduce((sum, doc) => sum + doc.rating, 0) / doctorsData.length).toFixed(1)}
+                  {doctorsData.length > 0 ? (doctorsData.reduce((sum, doc) => sum + (doc.rating || 0), 0) / doctorsData.length).toFixed(1) : '0.0'}
                 </div>
                 <p className="text-xs text-gray-500">Out of 5.0</p>
               </CardContent>
@@ -262,7 +241,6 @@ const AdminDoctors = () => {
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="on leave">On Leave</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
@@ -352,4 +330,4 @@ const AdminDoctors = () => {
   );
 };
 
-export default AdminDoctors; 
+export default AdminDoctors;

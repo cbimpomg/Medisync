@@ -1,6 +1,8 @@
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, collections, Doctor } from '../firebase';
 
+type DoctorStatus = 'Active' | 'On Leave' | 'Inactive';
+
 /**
  * Doctor Service - Handles all doctor-related operations with Firestore
  */
@@ -17,10 +19,15 @@ export const doctorService = {
       );
       
       const querySnapshot = await getDocs(doctorsQuery);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as Doctor
-      }));
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.displayName || 'Unknown Doctor',
+          status: (data.status || 'Inactive') as DoctorStatus,
+          ...data as Doctor
+        };
+      });
     } catch (error) {
       console.error('Error getting doctors:', error);
       throw error;
@@ -41,7 +48,27 @@ export const doctorService = {
       );
       
       const querySnapshot = await getDocs(doctorsQuery);
-      return querySnapshot.docs.map(doc => doc.data() as Doctor);
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          uid: doc.id,
+          id: doc.id,
+          email: data.email || '',
+          role: 'doctor',
+          displayName: data.displayName || 'Unknown Doctor',
+          specialization: data.specialization || '',
+          experience: data.experience || '',
+          qualifications: data.qualifications || '',
+          licenseNumber: data.licenseNumber || '',
+          schedule: data.schedule || '',
+          patients: data.patients || 0,
+          rating: data.rating || 0,
+          status: (data.status || 'Inactive') as DoctorStatus,
+          createdAt: data.createdAt || new Date(),
+          updatedAt: data.updatedAt || new Date()
+        } as Doctor;
+      });
     } catch (error) {
       console.error('Error getting doctors by specialization:', error);
       throw error;
@@ -57,9 +84,26 @@ export const doctorService = {
     try {
       const doctorDoc = await getDoc(doc(db, collections.users, doctorId));
       if (doctorDoc.exists()) {
-        const doctorData = doctorDoc.data() as Doctor;
-        if (doctorData.role === 'doctor') {
-          return doctorData;
+        const data = doctorDoc.data();
+        if (data.role === 'doctor') {
+          return {
+            ...data,
+            uid: doctorDoc.id,
+            id: doctorDoc.id,
+            email: data.email || '',
+            role: 'doctor',
+            displayName: data.displayName || 'Unknown Doctor',
+            specialization: data.specialization || '',
+            experience: data.experience || '',
+            qualifications: data.qualifications || '',
+            licenseNumber: data.licenseNumber || '',
+            schedule: data.schedule || '',
+            patients: data.patients || 0,
+            rating: data.rating || 0,
+            status: (data.status || 'Inactive') as DoctorStatus,
+            createdAt: data.createdAt || new Date(),
+            updatedAt: data.updatedAt || new Date()
+          } as Doctor;
         }
       }
       return null;

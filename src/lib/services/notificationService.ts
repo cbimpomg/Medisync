@@ -16,7 +16,67 @@ export interface AppointmentNotification {
   isRead?: boolean;
 }
 
+export interface BillingNotification {
+  id?: string;
+  patientId: string;
+  amount: number;
+  dueDate: string;
+  type: 'billing' | 'payment';
+  createdAt: Date;
+  isRead?: boolean;
+}
+
 export const notificationService = {
+  async sendBillingNotification(patientId: string, amount: number, dueDate: string) {
+    try {
+      const newNotification: Omit<BillingNotification, 'id' | 'createdAt'> = {
+        patientId,
+        amount,
+        dueDate,
+        type: 'billing',
+        isRead: false
+      };
+
+      const docRef = await addDoc(collection(db, 'notifications'), {
+        ...newNotification,
+        createdAt: serverTimestamp()
+      });
+
+      return {
+        id: docRef.id,
+        ...newNotification,
+        createdAt: new Date()
+      };
+    } catch (error) {
+      console.error('Error sending billing notification:', error);
+      throw error;
+    }
+  },
+
+  async sendPaymentReceivedNotification(patientId: string, amount: number) {
+    try {
+      const newNotification: Omit<BillingNotification, 'id' | 'createdAt' | 'dueDate'> = {
+        patientId,
+        amount,
+        type: 'payment',
+        isRead: false
+      };
+
+      const docRef = await addDoc(collection(db, 'notifications'), {
+        ...newNotification,
+        createdAt: serverTimestamp()
+      });
+
+      return {
+        id: docRef.id,
+        ...newNotification,
+        createdAt: new Date()
+      };
+    } catch (error) {
+      console.error('Error sending payment received notification:', error);
+      throw error;
+    }
+  },
   async createAppointmentNotification(notification: Omit<AppointmentNotification, 'id' | 'createdAt'>, recipientType: 'doctor' | 'manager' = 'manager', recipientId?: string) {
     try {
       if (recipientType === 'doctor' && !recipientId) {

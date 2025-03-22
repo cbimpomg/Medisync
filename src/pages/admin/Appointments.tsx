@@ -24,69 +24,92 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-// Mock appointments data
-const appointmentsData = [
-  {
-    id: "APT001",
-    patientName: "Ransford Agyei",
-    patientId: "P001",
-    doctorName: "Dr. Sarah Wilson",
-    doctorId: "D001",
-    type: "Consultation",
-    date: "2024-03-20",
-    time: "09:00 AM",
-    duration: "30 minutes",
-    status: "Scheduled",
-    room: "203",
-    notes: "Follow-up appointment",
-    department: "Cardiology"
-  },
-  {
-    id: "APT002",
-    patientName: "Emma Johnson",
-    patientId: "P002",
-    doctorName: "Dr. Michael Chang",
-    doctorId: "D002",
-    type: "Check-up",
-    date: "2024-03-20",
-    time: "10:30 AM",
-    duration: "45 minutes",
-    status: "In Progress",
-    room: "205",
-    notes: "Regular check-up",
-    department: "Orthopedics"
-  },
-  {
-    id: "APT003",
-    patientName: "Michael Chen",
-    patientId: "P003",
-    doctorName: "Dr. Lisa Brown",
-    doctorId: "D003",
-    type: "Emergency",
-    date: "2024-03-20",
-    time: "11:45 AM",
-    duration: "60 minutes",
-    status: "Completed",
-    room: "210",
-    notes: "Emergency consultation",
-    department: "Pediatrics"
-  }
-];
+import { useEffect } from 'react';
+import { collection, query, getDocs } from 'firebase/firestore';
+import { db, collections } from '@/lib/firebase';
+
+interface Appointment {
+  id: string;
+  patientName: string;
+  patientId: string;
+  doctorName: string;
+  doctorId: string;
+  type: string;
+  date: string;
+  time: string;
+  duration: string;
+  status: string;
+  room: string;
+  notes: string;
+  department: string;
+}
 
 const AdminAppointments = () => {
+  const [appointmentsData, setAppointmentsData] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        setIsLoading(true);
+        const appointmentsQuery = query(collection(db, collections.appointments));
+        const querySnapshot = await getDocs(appointmentsQuery);
+        const appointments = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            date: data.date?.toDate?.()?.toISOString?.().split('T')[0] || data.date
+          };
+        }) as Appointment[];
+        setAppointmentsData(appointments);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching appointments:', err);
+        setError('Failed to load appointments data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-gray-100">
+        <AdminSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen bg-gray-100">
+        <AdminSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-red-500">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
   const filteredAppointments = appointmentsData.filter(appointment => {
     const matchesSearch = 
-      appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      appointment.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      appointment.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || appointment.status.toLowerCase() === statusFilter.toLowerCase();
-    const matchesDepartment = departmentFilter === 'all' || appointment.department.toLowerCase() === departmentFilter.toLowerCase();
-    const matchesType = typeFilter === 'all' || appointment.type.toLowerCase() === typeFilter.toLowerCase();
+      ((appointment?.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (appointment?.doctorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (appointment?.id || '').toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus = statusFilter === 'all' || (appointment?.status || '').toLowerCase() === statusFilter.toLowerCase();
+    const matchesDepartment = departmentFilter === 'all' || (appointment?.department || '').toLowerCase() === departmentFilter.toLowerCase();
+    const matchesType = typeFilter === 'all' || (appointment?.type || '').toLowerCase() === typeFilter.toLowerCase();
     return matchesSearch && matchesStatus && matchesDepartment && matchesType;
   });
 
@@ -110,7 +133,7 @@ const AdminAppointments = () => {
       <AdminSidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto h-full">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Appointments Management</h1>
@@ -407,4 +430,4 @@ const AdminAppointments = () => {
   );
 };
 
-export default AdminAppointments; 
+export default AdminAppointments;

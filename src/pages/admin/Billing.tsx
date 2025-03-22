@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, DollarSign, CreditCard, Receipt, FileText, MoreHorizontal, Download } from 'lucide-react';
+import { billingService, PaymentMethod, PaymentStatus } from '@/lib/services/billingService';
+import { patientService, Patient } from '@/lib/services/patientService';
 import AdminSidebar from '@/components/layout/AdminSidebar';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,50 +25,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Mock billing data
-const billingData = [
-  {
-    id: "INV001",
-    patientName: "Ransford Agyei",
-    patientId: "P001",
-    date: "2024-03-15",
-    dueDate: "2024-04-15",
-    amount: 1250.00,
-    status: "Paid",
-    paymentMethod: "Credit Card",
-    service: "Consultation",
-    insurance: "Blue Cross"
-  },
-  {
-    id: "INV002",
-    patientName: "Emma Johnson",
-    patientId: "P002",
-    date: "2024-03-16",
-    dueDate: "2024-04-16",
-    amount: 2500.00,
-    status: "Pending",
-    paymentMethod: "Insurance",
-    service: "Surgery",
-    insurance: "Aetna"
-  },
-  {
-    id: "INV003",
-    patientName: "Michael Chen",
-    patientId: "P003",
-    date: "2024-03-17",
-    dueDate: "2024-04-17",
-    amount: 750.00,
-    status: "Overdue",
-    paymentMethod: "Cash",
-    service: "Lab Tests",
-    insurance: "United"
-  }
-];
-
 const AdminBilling = () => {
+  const [billingData, setBillingData] = useState([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [records, patientList] = await Promise.all([
+          billingService.getAllBillingRecords(),
+          patientService.getAllPatients()
+        ]);
+        setBillingData(records);
+        setPatients(patientList);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+    fetchData();
+  }, []);
 
   const filteredBilling = billingData.filter(bill => {
     const matchesSearch = 
@@ -130,9 +110,9 @@ const AdminBilling = () => {
                           <SelectValue placeholder="Select patient" />
                         </SelectTrigger>
                         <SelectContent>
-                          {billingData.map(bill => (
-                            <SelectItem key={bill.patientId} value={bill.patientId}>
-                              {bill.patientName}
+                          {patients.map(patient => (
+                            <SelectItem key={patient.id} value={patient.id}>
+                              {patient.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -182,7 +162,29 @@ const AdminBilling = () => {
 
                   <div className="flex justify-end gap-3">
                     <Button variant="outline">Cancel</Button>
-                    <Button>Create Invoice</Button>
+                    <Button onClick={async () => {
+                      try {
+                        const newBillingData = {
+                          patientId: 'selectedPatientId',
+                          patientName: 'selectedPatientName',
+                          treatmentId: 'selectedTreatmentId',
+                          treatmentType: 'selectedService',
+                          doctorId: 'selectedDoctorId',
+                          doctorName: 'selectedDoctorName',
+                          date: new Date().toISOString(),
+                          dueDate: 'selectedDueDate',
+                          amount: parseFloat('enteredAmount'),
+                          status: PaymentStatus.PENDING,
+                          paymentMethod: 'Credit Card' as PaymentMethod,
+                          insuranceProvider: 'selectedInsurance'
+                        };
+                        await billingService.createBillingRecord(newBillingData);
+                        const updatedRecords = await billingService.getAllBillingRecords();
+                        setBillingData(updatedRecords);
+                      } catch (error) {
+                        console.error('Error creating billing record:', error);
+                      }
+                    }}>Create Invoice</Button>
                   </div>
                 </div>
               </DialogContent>
@@ -198,7 +200,7 @@ const AdminBilling = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+                <div className="text-2xl font-bold">₵{totalRevenue.toFixed(2)}</div>
                 <p className="text-xs text-gray-500">This month</p>
               </CardContent>
             </Card>
@@ -210,7 +212,7 @@ const AdminBilling = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${pendingAmount.toFixed(2)}</div>
+                <div className="text-2xl font-bold">₵{pendingAmount.toFixed(2)}</div>
                 <p className="text-xs text-gray-500">To be collected</p>
               </CardContent>
             </Card>
@@ -222,7 +224,7 @@ const AdminBilling = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">${overdueAmount.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-red-600">₵{overdueAmount.toFixed(2)}</div>
                 <p className="text-xs text-gray-500">Past due date</p>
               </CardContent>
             </Card>
@@ -299,7 +301,7 @@ const AdminBilling = () => {
                         <div className="text-sm text-gray-500">ID: {bill.patientId}</div>
                       </TableCell>
                       <TableCell>{bill.service}</TableCell>
-                      <TableCell>${bill.amount.toFixed(2)}</TableCell>
+                      <TableCell>₵{bill.amount.toFixed(2)}</TableCell>
                       <TableCell>{bill.dueDate}</TableCell>
                       <TableCell>{bill.insurance}</TableCell>
                       <TableCell>
@@ -319,7 +321,15 @@ const AdminBilling = () => {
                               <Download className="h-4 w-4 mr-2" />
                               Download Invoice
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={async () => {
+                              try {
+                                await billingService.processPayment(bill.id, 'Credit Card');
+                                const updatedRecords = await billingService.getAllBillingRecords();
+                                setBillingData(updatedRecords);
+                              } catch (error) {
+                                console.error('Error processing payment:', error);
+                              }
+                            }}>
                               <CreditCard className="h-4 w-4 mr-2" />
                               Record Payment
                             </DropdownMenuItem>
@@ -338,4 +348,4 @@ const AdminBilling = () => {
   );
 };
 
-export default AdminBilling; 
+export default AdminBilling;

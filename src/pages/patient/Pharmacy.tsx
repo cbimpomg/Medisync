@@ -398,7 +398,7 @@ const PharmacyContent = () => {
                     <p className="text-gray-500 mb-8 max-w-sm mx-auto">Browse our wide selection of medications and health products to get started</p>
                     <Button 
                       onClick={() => setShowCart(false)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 rounded-full shadow-sm"
+                      className="bg-medisync-primary hover:bg-medisync-secondary text-white px-8 py-2 rounded-full shadow-sm"
                     >
                       Browse Products
                     </Button>
@@ -426,20 +426,6 @@ const PharmacyContent = () => {
                             onChange={(e) => setSearchQuery(e.target.value)}
                           />
                         </div>
-                        
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="relative"
-                          onClick={() => setShowCart(true)}
-                        >
-                          <ShoppingCart className="h-5 w-5" />
-                          {cart.length > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">
-                              {cart.length}
-                            </span>
-                          )}
-                        </Button>
                       </div>
                     </div>
                   </Tabs>
@@ -455,8 +441,8 @@ const PharmacyContent = () => {
                             key={category.id} 
                             className={`px-4 py-2.5 rounded-lg cursor-pointer transition-all hover:shadow-sm ${
                               categoryFilter === category.id 
-                                ? 'bg-blue-50 text-blue-600 font-medium shadow-sm' 
-                                : 'hover:bg-gray-50'
+                                ? 'bg-medisync-primary text-white font-medium shadow-sm' 
+                                : 'hover:bg-medisync-accent/50'
                             }`}
                             onClick={() => setCategoryFilter(category.id)}
                           >
@@ -521,12 +507,12 @@ const PharmacyContent = () => {
                                         <span className="text-sm text-gray-400 line-through">₵{medication.price.toFixed(2)}</span>
                                       </div>
                                     ) : (
-                                      <span className="text-xl font-semibold text-blue-600">₵{medication.price.toFixed(2)}</span>
+                                      <span className="text-xl font-semibold text-medisync-primary">₵{medication.price.toFixed(2)}</span>
                                     )}
                                   </div>
                                   
                                   <Button 
-                                    className="bg-blue-500 hover:bg-blue-600 text-white shadow-sm"
+                                    className="bg-medisync-primary hover:bg-medisync accent/50 text-white shadow-sm"
                                     disabled={!medication.inStock || medication.requiresPrescription}
                                     onClick={() => addToCart(medication)}
                                   >

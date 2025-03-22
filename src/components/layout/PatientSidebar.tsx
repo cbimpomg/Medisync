@@ -10,7 +10,8 @@ import {
   Video,
   Brain,
   LogOut,
-  User
+  User,
+  Receipt
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +33,7 @@ const PatientSidebar = () => {
     { icon: MessageCircle, label: 'Message', path: '/messages' },
     { icon: Video, label: 'Telehealth', path: '/telehealth' },
     { icon: Brain, label: 'AI Symptom Checker', path: '/symptom-checker' },
+    { icon: Receipt, label: 'Billing', path: '/billing' },
   ];
 
   const handleLogout = () => {
@@ -62,8 +64,8 @@ const PatientSidebar = () => {
             key={item.path}
             to={item.path}
             className={cn(
-              "patient-sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors",
-              location.pathname === item.path && "bg-blue-100 text-blue-600 font-medium"
+              "patient-sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-medisync-accent/50 hover:text-medisync-primary",
+              location.pathname === item.path && "bg-medisync-primary text-white font-medium"
             )}
           >
             <item.icon className="h-5 w-5" />

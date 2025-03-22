@@ -53,6 +53,7 @@ import AdminReports from "./pages/admin/Reports";
 import AdminBilling from "./pages/admin/Billing";
 import AdminSettings from "./pages/admin/Settings";
 import PharmacyAdmin from "./pages/admin/Pharmacy";
+import PatientBilling from "./pages/patient/Billing";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,7 @@ const App = () => {
               <Route path="/medical-records" element={<MedicalRecords />} />
               <Route path="/prescriptions" element={<Prescriptions />} />
               <Route path="/pharmacy" element={<Pharmacy />} />
+              <Route path="/billing" element={<PatientBilling />} />
               <Route path="/patient/checkout" element={<Checkout cartItems={window.history.state?.cartItems || []} />} />
               <Route path="/patient/payment/verify" element={<PaymentVerification />} />
               
