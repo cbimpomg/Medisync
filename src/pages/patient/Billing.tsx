@@ -15,20 +15,30 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import PatientSidebar from '@/components/layout/PatientSidebar';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
+import { PaymentMethod } from '@/lib/services/billingService';
+import { Select, SelectTrigger } from '@radix-ui/react-select';
+import { SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 
 const PatientBilling = () => {
+  const { user } = useAuth();
   const [billingData, setBillingData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('Credit Card');
 
   useEffect(() => {
     const fetchBillingData = async () => {
       try {
         setIsLoading(true);
-        // Replace with actual patient ID from auth context
-        const patientId = 'current-patient-id';
-        const records = await billingService.getPatientBillingRecords(patientId);
+        if (!user?.uid) {
+          setError('User not authenticated');
+          return;
+        }
+        const records = await billingService.getPatientBillingRecords(user.uid);
         setBillingData(records);
         setError(null);
       } catch (error) {
@@ -39,11 +49,11 @@ const PatientBilling = () => {
       }
     };
     fetchBillingData();
-  }, []);
+  }, [user?.uid]);
 
   const filteredBilling = billingData.filter(bill =>
     bill.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    bill.service.toLowerCase().includes(searchQuery.toLowerCase())
+    bill.treatmentType.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusColor = (status) => {
@@ -150,80 +160,115 @@ const PatientBilling = () => {
                 />
               </div>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice ID</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBilling.map((bill) => (
-                  <TableRow key={bill.id}>
-                    <TableCell>{bill.id}</TableCell>
-                    <TableCell>{bill.service}</TableCell>
-                    <TableCell>{new Date(bill.date).toLocaleDateString()}</TableCell>
-                    <TableCell>₵{bill.amount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(bill.status)}>
-                        {bill.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            View Details
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Invoice Details</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-sm font-medium">Invoice ID</p>
-                                <p className="text-sm text-gray-500">{bill.id}</p>
+            <div className="max-h-[500px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice ID</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBilling.map((bill) => (
+                    <TableRow key={bill.id}>
+                      <TableCell>{bill.id}</TableCell>
+                      <TableCell>{bill.treatmentType}</TableCell>
+                      <TableCell>{new Date(bill.date).toLocaleDateString()}</TableCell>
+                      <TableCell>₵{bill.amount.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(bill.status)}>
+                          {bill.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              View Details
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Invoice Details</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-sm font-medium">Invoice ID</p>
+                                  <p className="text-sm text-gray-500">{bill.id}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Date</p>
+                                  <p className="text-sm text-gray-500">
+                                    {new Date(bill.date).toLocaleDateString()}
+                                  </p>
+                                </div>
                               </div>
                               <div>
-                                <p className="text-sm font-medium">Date</p>
-                                <p className="text-sm text-gray-500">
-                                  {new Date(bill.date).toLocaleDateString()}
-                                </p>
+                                <p className="text-sm font-medium">Service</p>
+                                <p className="text-sm text-gray-500">{bill.treatmentType}</p>
                               </div>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Service</p>
-                              <p className="text-sm text-gray-500">{bill.service}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-sm font-medium">Amount</p>
-                                <p className="text-sm text-gray-500">₵{bill.amount.toFixed(2)}</p>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-sm font-medium">Amount</p>
+                                  <p className="text-sm text-gray-500">₵{bill.amount.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Status</p>
+                                  <Badge className={getStatusColor(bill.status)}>
+                                    {bill.status}
+                                  </Badge>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm font-medium">Status</p>
-                                <Badge className={getStatusColor(bill.status)}>
-                                  {bill.status}
-                                </Badge>
-                              </div>
-                            </div>
-                            {bill.status === 'Pending' && (
-                              <Button className="w-full" onClick={() => {
-                                // Implement payment logic
-                              }}>
-                                Pay Now
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              className="w-full"
-                              onClick={() => {
+                              {bill.status === 'Pending' && (
+                                <>
+                                  <Select value={selectedPaymentMethod} onValueChange={(value: string) => setSelectedPaymentMethod(value as PaymentMethod)}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select payment method" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Credit Card">Credit Card</SelectItem>
+                                      <SelectItem value="Insurance">Insurance</SelectItem>
+                                      <SelectItem value="Cash">Cash</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button 
+                                    className="w-full" 
+                                    disabled={isProcessingPayment}
+                                    onClick={async () => {
+                                      setIsProcessingPayment(true);
+                                      try {
+                                        await billingService.processPayment(bill.id, selectedPaymentMethod);
+                                        const updatedRecords = await billingService.getPatientBillingRecords(user.uid);
+                                        setBillingData(updatedRecords);
+                                        toast({
+                                          title: "Payment Successful",
+                                          description: "Your payment has been processed successfully.",
+                                          variant: "default"
+                                        });
+                                      } catch (error) {
+                                        console.error('Payment processing error:', error);
+                                        toast({
+                                          title: "Payment Failed",
+                                          description: "There was an error processing your payment. Please try again.",
+                                          variant: "destructive"
+                                        });
+                                      } finally {
+                                        setIsProcessingPayment(false);
+                                      }
+                                    }}>
+                                    Pay Now
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
                                 // Implement download logic
                               }}
                             >
@@ -238,6 +283,7 @@ const PatientBilling = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
         </div>

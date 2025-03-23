@@ -31,7 +31,7 @@ const SymptomChecker = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
+      id: crypto.randomUUID(),
       role: 'assistant',
       content: 'Hello! I\'m MediSync AI Assistant. Please describe any symptoms you\'re experiencing, and I\'ll try to help you understand what might be happening and suggest next steps.',
       timestamp: new Date()
@@ -42,6 +42,12 @@ const SymptomChecker = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [assessmentHistory, setAssessmentHistory] = useState<SymptomAssessment[]>([]);
+  const [currentStep, setCurrentStep] = useState<'initial' | 'gathering' | 'analyzing'>('initial');
+  const [symptomDetails, setSymptomDetails] = useState<{
+    duration?: string;
+    severity?: 'mild' | 'moderate' | 'severe';
+    frequency?: 'constant' | 'intermittent' | 'periodic';
+  }>({});
   
   // Fetch assessment history when user is loaded
   useEffect(() => {
@@ -92,9 +98,8 @@ const SymptomChecker = () => {
   const handleSendMessage = async () => {
     if (!input.trim() || !user) return;
     
-    // Add user message
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'user',
       content: input,
       timestamp: new Date()
@@ -105,30 +110,55 @@ const SymptomChecker = () => {
     setIsLoading(true);
     
     try {
-      // Submit symptoms to the backend service
-      const assessment = await symptomService.submitSymptoms({
-        patientId: user.uid,
-        symptoms: [input],
-        description: input
-      });
+      let aiResponse = '';
+      let assessment;
+      if (currentStep === 'initial') {
+        aiResponse = 'Thank you for describing your symptoms. To better understand your condition, could you tell me how long you\'ve been experiencing these symptoms?';
+        setCurrentStep('gathering');
+      } else if (currentStep === 'gathering' && !symptomDetails.duration) {
+        setSymptomDetails(prev => ({ ...prev, duration: input }));
+        aiResponse = 'How would you rate the severity of your symptoms? (mild, moderate, or severe)?';
+      } else if (currentStep === 'gathering' && !symptomDetails.severity) {
+        setSymptomDetails(prev => ({ ...prev, severity: input.toLowerCase() as 'mild' | 'moderate' | 'severe' }));
+        aiResponse = 'Do these symptoms occur constantly, intermittently, or periodically?';
+      } else if (currentStep === 'gathering' && !symptomDetails.frequency) {
+        setSymptomDetails(prev => ({ ...prev, frequency: input.toLowerCase() as 'constant' | 'intermittent' | 'periodic' }));
+        setCurrentStep('analyzing');
+        
+        // Submit complete symptom assessment
+        assessment = await symptomService.submitSymptoms({
+          patientId: user.uid,
+          symptoms: [userMessage.content],
+          description: `Symptoms: ${userMessage.content}\nDuration: ${symptomDetails.duration}\nSeverity: ${symptomDetails.severity}\nFrequency: ${input}`
+        });
+      } else {
+        // Submit symptoms to the backend service
+        assessment = await symptomService.submitSymptoms({
+          patientId: user.uid,
+          symptoms: [input],
+          description: input
+        });
+      }
       
-      // Add AI response from the service
+      // Add AI response
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: 'assistant',
-        content: assessment.analysis.possibleConditions.map(condition => 
-          `${condition.name}: ${condition.description} (Probability: ${condition.probability})`
-        ).join('\n\n') + '\n\nRecommendations:\n' + 
-        assessment.analysis.recommendedActions.map(action => 
-          `- ${action.title}: ${action.description}`
-        ).join('\n'),
+        content: currentStep === 'analyzing' && assessment?.analysis ? 
+          (assessment.analysis.possibleConditions || []).map(condition => 
+            `${condition.name}: ${condition.description} (Probability: ${condition.probability})`
+          ).join('\n\n') + '\n\nRecommendations:\n' + 
+          (assessment.analysis.recommendedActions || []).map(action => 
+            `- ${action.title}: ${action.description}`
+          ).join('\n') :
+          aiResponse,
         timestamp: new Date()
       };
       
       setMessages(prev => [...prev, aiMessage]);
       
       // Convert service recommendations to UI recommendations
-      const uiRecommendations: Recommendation[] = assessment.analysis.recommendedActions.map(rec => ({
+      const uiRecommendations: Recommendation[] = (assessment?.analysis?.recommendedActions || []).map(rec => ({
         title: rec.title,
         description: rec.description,
         urgency: rec.urgency,
@@ -152,7 +182,7 @@ const SymptomChecker = () => {
       
       // Add error message with more specific feedback
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: error.message?.includes('Unable to connect') ?
           "I'm having trouble connecting to the medical analysis service. Please check your internet connection and try again." :
@@ -342,22 +372,22 @@ const SymptomChecker = () => {
                             <div className="flex justify-between items-start">
                               <div>
                                 <h4 className="font-semibold">
-                                  {assessment.symptoms.map(s => s.name).join(', ')}
+                                  {assessment.symptoms?.map(s => s.name).join(', ') || 'No symptoms recorded'}
                                 </h4>
                                 <p className="text-xs text-gray-500">
-                                  {assessment.createdAt.toLocaleDateString()} at {assessment.createdAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                  {assessment.createdAt instanceof Date ? 
+                                    `${assessment.createdAt.toLocaleDateString()} at ${assessment.createdAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` :
+                                    'Date not available'}
                                 </p>
                               </div>
                               <Badge 
-                                className={
-                                  assessment.analysis.severity === 'high' ? 'bg-red-500' : 
-                                  assessment.analysis.severity === 'medium' ? 'bg-yellow-500' : 
-                                  assessment.analysis.severity === 'low' ? 'bg-blue-500' : 'bg-gray-500'
-                                }
+                                className={`${assessment?.analysis?.severity === 'high' ? 'bg-red-500' : 
+                                assessment?.analysis?.severity === 'medium' ? 'bg-yellow-500' : 
+                                assessment?.analysis?.severity === 'low' ? 'bg-blue-500' : 'bg-gray-500'}`}
                               >
-                                {assessment.analysis.severity === 'high' ? 'Urgent' : 
-                                 assessment.analysis.severity === 'medium' ? 'Moderate' : 
-                                 assessment.analysis.severity === 'low' ? 'Low Urgency' : 'None'}
+                                {assessment?.analysis?.severity === 'high' ? 'Urgent' : 
+                                 assessment?.analysis?.severity === 'medium' ? 'Moderate' : 
+                                 assessment?.analysis?.severity === 'low' ? 'Low Urgency' : 'None'}
                               </Badge>
                             </div>
                             
@@ -366,10 +396,10 @@ const SymptomChecker = () => {
                             <div className="text-sm">
                               <p className="font-medium">Possible conditions:</p>
                               <ul className="list-disc pl-5 mt-1 text-gray-600 text-xs">
-                                {assessment.analysis.possibleConditions.slice(0, 3).map((condition, idx) => (
+                                {assessment?.analysis?.possibleConditions?.slice(0, 3).map((condition, idx) => (
                                   <li key={idx}>{condition.name}</li>
-                                ))}
-                                {assessment.analysis.possibleConditions.length > 3 && (
+                                )) || <li>No conditions available</li>}
+                                {assessment?.analysis?.possibleConditions?.length > 3 && (
                                   <li>+ {assessment.analysis.possibleConditions.length - 3} more</li>
                                 )}
                               </ul>

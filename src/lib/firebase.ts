@@ -17,12 +17,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with persistent cache configuration
-export const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-    })
-});
+// Initialize Firestore
+export const db = getFirestore(app);
 
 // Initialize and export Firebase services
 export const auth = getAuth(app);

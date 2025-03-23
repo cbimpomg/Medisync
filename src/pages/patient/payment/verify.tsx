@@ -31,20 +31,35 @@ const PaymentVerification = () => {
         const response = await paystackService.verifyTransaction(reference);
 
         if (response.status && response.data.status === 'success') {
-          // Set mock order details (replace with actual data from your backend)
           const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-          const mockOrderDetails = {
+          const total = parseFloat(localStorage.getItem('orderTotal') || '0');
+
+          // Create order in pharmacy system
+          await pharmacyApi.createOrder({
+            medications: cartItems.map(item => ({
+              medicationId: item.medicationId,
+              quantity: item.quantity
+            })),
+            paymentMethod: 'paystack',
+            paymentDetails: {
+              reference,
+              status: 'completed',
+              amount: total
+            }
+          });
+
+          const orderDetails = {
             items: cartItems,
-            total: cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+            total,
             orderNumber: reference,
             estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
           };
           
-          setOrderDetails(mockOrderDetails);
+          setOrderDetails(orderDetails);
           setStatus('success');
           toast({
             title: 'Payment Successful',
-            description: 'Your order has been confirmed.',
+            description: 'Your order has been confirmed and is being processed.',
           });
 
           // Clear the payment reference and cart data

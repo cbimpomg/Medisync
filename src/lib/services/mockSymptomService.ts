@@ -5,7 +5,13 @@ const STORAGE_KEY = 'symptom_assessments';
 class MockSymptomService {
   private getStoredAssessments(): SymptomAssessment[] {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    const assessments = JSON.parse(stored);
+    return assessments.map((assessment: SymptomAssessment) => ({
+      ...assessment,
+      createdAt: new Date(assessment.createdAt),
+      updatedAt: new Date(assessment.updatedAt)
+    }));
   }
 
   private saveAssessments(assessments: SymptomAssessment[]): void {

@@ -153,10 +153,13 @@ export const pharmacyApi = {
     prescriptionId?: string;
     paymentMethod: string;
     paymentDetails?: {
-      cardNumber: string;
-      expiryDate: string;
-      cvv: string;
-      name: string;
+      cardNumber?: string;
+      expiryDate?: string;
+      cvv?: string;
+      name?: string;
+      reference?: string;
+      status?: string;
+      amount?: number;
     };
   }) => api.post('/pharmacy/orders', data),
   getPatientOrders: () => api.get('/pharmacy/orders/patient'),

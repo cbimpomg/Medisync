@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, DollarSign, CreditCard, Receipt, FileText, MoreHorizontal, Download } from 'lucide-react';
 import { billingService, PaymentMethod, PaymentStatus } from '@/lib/services/billingService';
 import { patientService, Patient } from '@/lib/services/patientService';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db, collections } from '@/lib/firebase';
 import AdminSidebar from '@/components/layout/AdminSidebar';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 
 const AdminBilling = () => {
   const [billingData, setBillingData] = useState([]);
@@ -31,6 +34,12 @@ const AdminBilling = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
+  const [open, setOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState('');
+  const [selectedService, setSelectedService] = useState('');
+  const [amount, setAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [selectedInsurance, setSelectedInsurance] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,6 +55,27 @@ const AdminBilling = () => {
       }
     };
     fetchData();
+
+    // Subscribe to real-time updates
+    const billingRef = collection(db, collections.billing);
+    const unsubscribe = onSnapshot(billingRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified') {
+          setBillingData(prevData => {
+            const updatedData = [...prevData];
+            const index = updatedData.findIndex(bill => bill.id === change.doc.id);
+            if (index !== -1) {
+              updatedData[index] = { id: change.doc.id, ...change.doc.data() };
+            }
+            return updatedData;
+          });
+        }
+      });
+    }, (error) => {
+      console.error('Error in real-time update:', error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const filteredBilling = billingData.filter(bill => {
@@ -83,14 +113,14 @@ const AdminBilling = () => {
       <AdminSidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Billing Management</h1>
               <p className="text-gray-600">Manage invoices and payments</p>
             </div>
 
-            <Dialog>
+            <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
@@ -105,7 +135,7 @@ const AdminBilling = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="patient">Patient</Label>
-                      <Select>
+                      <Select value={selectedPatient} onValueChange={setSelectedPatient}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
                         </SelectTrigger>
@@ -120,7 +150,7 @@ const AdminBilling = () => {
                     </div>
                     <div>
                       <Label htmlFor="service">Service</Label>
-                      <Select>
+                      <Select value={selectedService} onValueChange={setSelectedService}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select service" />
                         </SelectTrigger>
@@ -137,17 +167,17 @@ const AdminBilling = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="amount">Amount</Label>
-                      <Input id="amount" type="number" placeholder="Enter amount" />
+                      <Input id="amount" type="number" placeholder="Enter amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
                     </div>
                     <div>
                       <Label htmlFor="dueDate">Due Date</Label>
-                      <Input id="dueDate" type="date" />
+                      <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                     </div>
                   </div>
 
                   <div>
                     <Label htmlFor="insurance">Insurance Provider</Label>
-                    <Select>
+                    <Select value={selectedInsurance} onValueChange={setSelectedInsurance}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select insurance" />
                       </SelectTrigger>
@@ -164,23 +194,49 @@ const AdminBilling = () => {
                     <Button variant="outline">Cancel</Button>
                     <Button onClick={async () => {
                       try {
+                        const selectedPatientData = patients.find(p => p.id === selectedPatient);
+                        if (!selectedPatient || !selectedService || !amount || !dueDate || !selectedInsurance) {
+                          toast({
+                            title: "Error",
+                            description: "Please fill in all required fields",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+
+                        const parsedAmount = parseFloat(amount);
+                        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+                          toast({
+                            title: "Error",
+                            description: "Please enter a valid amount",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+
                         const newBillingData = {
-                          patientId: 'selectedPatientId',
-                          patientName: 'selectedPatientName',
-                          treatmentId: 'selectedTreatmentId',
-                          treatmentType: 'selectedService',
-                          doctorId: 'selectedDoctorId',
-                          doctorName: 'selectedDoctorName',
+                          patientId: selectedPatient,
+                          patientName: selectedPatientData?.name || '',
+                          treatmentId: Date.now().toString(),
+                          treatmentType: selectedService,
+                          doctorId: 'currentDoctorId',
+                          doctorName: 'currentDoctorName',
                           date: new Date().toISOString(),
-                          dueDate: 'selectedDueDate',
-                          amount: parseFloat('enteredAmount'),
+                          dueDate: dueDate,
+                          amount: parsedAmount,
                           status: PaymentStatus.PENDING,
                           paymentMethod: 'Credit Card' as PaymentMethod,
-                          insuranceProvider: 'selectedInsurance'
+                          insuranceProvider: selectedInsurance
                         };
                         await billingService.createBillingRecord(newBillingData);
                         const updatedRecords = await billingService.getAllBillingRecords();
                         setBillingData(updatedRecords);
+                        setOpen(false);
+                        setSelectedPatient('');
+                        setSelectedService('');
+                        setAmount('');
+                        setDueDate('');
+                        setSelectedInsurance('');
                       } catch (error) {
                         console.error('Error creating billing record:', error);
                       }
@@ -244,7 +300,7 @@ const AdminBilling = () => {
 
           <Card>
             <CardContent className="p-0">
-              <div className="flex justify-between items-center p-4 border-b">
+              <div className="p-4 border-b">
                 <div className="flex gap-4">
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -279,67 +335,78 @@ const AdminBilling = () => {
                   </Select>
                 </div>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice ID</TableHead>
-                    <TableHead>Patient</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Insurance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBilling.map((bill) => (
-                    <TableRow key={bill.id}>
-                      <TableCell>{bill.id}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{bill.patientName}</div>
-                        <div className="text-sm text-gray-500">ID: {bill.patientId}</div>
-                      </TableCell>
-                      <TableCell>{bill.service}</TableCell>
-                      <TableCell>₵{bill.amount.toFixed(2)}</TableCell>
-                      <TableCell>{bill.dueDate}</TableCell>
-                      <TableCell>{bill.insurance}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(bill.status)}>
-                          {bill.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Download className="h-4 w-4 mr-2" />
-                              Download Invoice
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={async () => {
-                              try {
-                                await billingService.processPayment(bill.id, 'Credit Card');
-                                const updatedRecords = await billingService.getAllBillingRecords();
-                                setBillingData(updatedRecords);
-                              } catch (error) {
-                                console.error('Error processing payment:', error);
-                              }
-                            }}>
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Record Payment
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              <div className="max-h-[500px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice ID</TableHead>
+                      <TableHead>Patient</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBilling.map((bill) => (
+                      <TableRow key={bill.id}>
+                        <TableCell>{bill.id}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{bill.patientName}</div>
+                          <div className="text-sm text-gray-500">ID: {bill.patientId}</div>
+                        </TableCell>
+                        <TableCell>{bill.treatmentType}</TableCell>
+                        <TableCell>₵{bill.amount.toFixed(2)}</TableCell>
+                        <TableCell>{bill.dueDate}</TableCell>
+                        <TableCell>{bill.insuranceProvider}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(bill.status)}>
+                            {bill.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={async () => {
+                                try {
+                                  await billingService.processPayment(bill.id, 'Credit Card');
+                                  const updatedRecords = await billingService.getAllBillingRecords();
+                                  setBillingData(updatedRecords);
+                                  toast({
+                                    title: "Payment Processed",
+                                    description: "Payment has been recorded successfully.",
+                                    variant: "default"
+                                  });
+                                } catch (error) {
+                                  console.error('Error processing payment:', error);
+                                  toast({
+                                    title: "Payment Failed",
+                                    description: "There was an error processing the payment. Please try again.",
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Record Payment
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
