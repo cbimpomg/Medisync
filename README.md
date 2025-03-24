@@ -1,97 +1,168 @@
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+# Syncra Health Portal
 
-Follow these steps:
+A comprehensive healthcare management system designed to streamline medical services, enhance patient care, and improve healthcare provider efficiency. The platform facilitates seamless communication between patients, doctors, and nurses while managing appointments, prescriptions, and patient records in real-time.
 
-```bash
-# Step 1: Clone the repository using the project's Git URL.
-git clone https://github.com/cbimpomg/Medisync
+## System Architecture
 
-# Step 2: Navigate to the project directory.
-cd syncra-health-portal
+### Frontend (Portal)
+- **Technology Stack**: React + TypeScript + Vite
+- **State Management**: React Context API
+- **UI Framework**: Tailwind CSS
+- **Real-time Updates**: Firebase Firestore subscriptions
+- **Responsive Design**: Optimized for multiple devices
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Backend
+- **Database**: Firebase Firestore
+- **Authentication**: Firebase Auth
+- **API Layer**: Firebase Admin SDK
+- **Real-time Sync**: WebSocket-based subscriptions
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+## Core Services
+
+### Appointment Service
+
+#### Features
+- Real-time appointment tracking
+- Separate handling for in-person and telehealth appointments
+- Automatic status updates
+- Availability checking
+- Automated notifications
+
+#### Appointment Types
+- **In-person**: Traditional clinic visits
+- **Telehealth**: Remote video consultations
+
+#### Appointment Status Flow
+1. scheduled → in-progress → completed
+2. scheduled → cancelled
+
+### Prescription Service
+
+#### Features
+- Digital prescription management
+- Medication tracking
+- Status updates (active/completed/cancelled)
+- Historical prescription records
+
+#### Prescription Data Model
+```typescript
+interface Prescription {
+  medications: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    instructions?: string;
+  }>;
+  status: 'active' | 'completed' | 'cancelled';
+}
 ```
 
-commit and push your changes once you're done.
+### Patient Service
 
-## What technologies are used for this project?
+#### Features
+- Patient profile management
+- Real-time vitals tracking
+- Insurance information handling
+- Medical history maintenance
 
-This project is built with .
+#### Patient Data Model
+```typescript
+interface Patient {
+  vitals: {
+    temperature: string;
+    bloodPressure: string;
+    heartRate: string;
+    oxygenSaturation: string;
+  };
+  status: 'Active' | 'Inactive';
+}
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-## Project Structure
+### Notification Service
 
-The project follows a typical React application structure, with the following key directories:
+#### Types of Notifications
+1. **Appointment Notifications**
+   - Schedule confirmations
+   - Reminders
+   - Status updates
 
-- `src/`: Contains the source code of the application.
-  - `components/`: Contains reusable React components.
-  - `pages/`: Contains the individual pages of the application.
-  - `styles/`: Contains the CSS files for styling.
-  - `utils/`: Contains utility functions and helpers.
-  - `App.tsx`: The main entry point of the application.
+2. **Billing Notifications**
+   - Payment due
+   - Payment received
 
-## Backend Architecture and Technology Stack
+## Real-time Subscription Patterns
 
-A. Core Services:
-1. Auth Service
-   - Technology: Node.js + Express
-   - Responsibility: Authentication, authorization, user management
+### Appointment Subscriptions
+```typescript
+subscribeToAppointments(role, userId, callback)
+subscribeToTelehealthAppointments(role, userId, callback)
+```
 
-2. Patient Service
-   - Technology: Node.js + Express
-   - Responsibility: Patient management, medical records
+### Patient Subscriptions
+```typescript
+subscribeToPatients(callback)
+```
 
-3. Doctor Service
-   - Technology: Node.js + Express
-   - Responsibility: Doctor management, schedules
+## Security
 
-4. Appointment Service
-   - Technology: Node.js + Express
-   - Responsibility: Appointment scheduling, management
+### Authentication
+- Role-based access control (RBAC)
+- Secure session management
+- Firebase Authentication integration
+- Protected routes
 
-5. Prescription Service
-   - Technology: Node.js + Express
-   - Responsibility: Prescription management
+### Data Access
+- Firestore security rules
+- Field-level security
+- Data encryption
+- Input validation
 
-6. Billing Service
-   - Technology: Node.js + Express
-   - Responsibility: Billing, payments, insurance
+## Development Setup
 
-B. Supporting Services:
-1. Notification Service
-   - Technology: Node.js + Bull for queue management
-   - Responsibility: Email, SMS, in-app notifications
+### Prerequisites
+- Node.js (v14 or higher)
+- npm or yarn package manager
+- Git for version control
 
-2. File Service
-   - Technology: Node.js + Express
-   - Responsibility: File upload, storage management
+### Installation
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Create `.env` file based on `.env.example`
+4. Configure Firebase credentials
+5. Start development server: `npm run dev`
+6. Access the application at `http://localhost:5173`
 
-3. Report Service
-   - Technology: Node.js + Express
-   - Responsibility: Generate and manage reports
+## Best Practices
 
-C. Infrastructure:
-1. API Gateway
-   - Technology: Kong or Netflix Zuul
-   - Responsibility: Route management, rate limiting
+### Code Organization
+- Services in `src/lib/services`
+- Components in `src/components`
+- Pages in `src/pages`
+- Hooks in `src/hooks`
+- Component-based architecture
+- Type-safe development with TypeScript
 
-2. Service Discovery
-   - Technology: Consul
-   - Responsibility: Service registration and discovery
+### Error Handling
+- Consistent error logging
+- User-friendly error messages
+- Graceful degradation
 
-3. Message Broker
-   - Technology: RabbitMQ
-   - Responsibility: Inter-service communication
+### Performance
+- Optimized Firebase queries
+- Efficient real-time subscriptions
+- Lazy loading of components
+- Efficient data caching
+- Minimized bundle size
 
-4. Monitoring
-   - Technology: Prometheus + Grafana
-   - Responsibility: System monitoring and alerts
+## Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Create pull request
+
+## License
+
+MIT License
