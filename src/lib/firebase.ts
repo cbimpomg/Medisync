@@ -8,7 +8,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyCJdqlA_cPG8BV1k_jrHLgWG4ROzd0gOEs",
     authDomain: "syncra-health.firebaseapp.com",
     projectId: "syncra-health",
-    storageBucket: "syncra-health.firebasestorage.app",
+    storageBucket: "syncra-health.firebfeesstrage.apprage.app",
     messagingSenderId: "1098843065499",
     appId: "1:1098843065499:web:f5875c5a18ecac7e214a3e",
     measurementId: "G-30EEFWD3J2"

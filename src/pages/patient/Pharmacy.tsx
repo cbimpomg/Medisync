@@ -377,14 +377,14 @@ const PharmacyContent = () => {
                         <Separator className="my-3" />
                         <div className="flex justify-between items-center text-lg font-semibold">
                           <span>Total</span>
-                          <span className="text-blue-600">₵{(calculateTotal() + 5.99 + (calculateTotal() * 0.07)).toFixed(2)}</span>
+                          <span className="text-medisync-primary">₵{(calculateTotal() + 5.99 + (calculateTotal() * 0.07)).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
                     
                     <div className="mt-6 flex justify-end">
                       <Button 
-                        className="bg-blue-500 hover:bg-blue-600 text-white"
+                        className="bg-medisync-primary hover:bg-medisync-secondary text-white"
                         onClick={handleCheckout}
                       >
                         Proceed to Checkout

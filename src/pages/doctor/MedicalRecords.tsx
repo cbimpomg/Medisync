@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, Plus, FileText, Calendar, Upload, Download, Eye } from 'lucide-react';
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import { Button } from "@/components/ui/button";
@@ -10,46 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { patientService } from '@/lib/services/patientService';
+import { MedicalRecord, medicalRecordService } from '@/lib/services/medicalRecordService';
+import { useAuth } from '@/hooks/useAuth';
 
-// Mock medical records data
-const medicalRecords = [
-  {
-    id: "MR001",
-    patientName: "Ransford Agyei",
-    patientId: "P001",
-    recordType: "Lab Result",
-    category: "Blood Test",
-    date: "2024-03-15",
-    status: "Normal",
-    provider: "Dr. Sarah Smith",
-    summary: "Complete Blood Count (CBC) - All values within normal range",
-    attachments: ["cbc_results.pdf"]
-  },
-  {
-    id: "MR002",
-    patientName: "Emma Johnson",
-    patientId: "P002",
-    recordType: "Imaging",
-    category: "X-Ray",
-    date: "2024-03-10",
-    status: "Abnormal",
-    provider: "Dr. James Wilson",
-    summary: "Chest X-Ray - Shows mild inflammation in lower right lobe",
-    attachments: ["chest_xray.jpg"]
-  },
-  {
-    id: "MR003",
-    patientName: "Michael Chen",
-    patientId: "P003",
-    recordType: "Clinical Note",
-    category: "Follow-up",
-    date: "2024-02-28",
-    status: "Completed",
-    provider: "Dr. Sarah Smith",
-    summary: "Follow-up visit for arthritis management - Patient reports improved mobility",
-    attachments: []
-  }
-];
+
 
 const recordTypes = [
   "Lab Result",
@@ -62,10 +27,20 @@ const recordTypes = [
 ];
 
 const DoctorMedicalRecords = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedRecord, setSelectedRecord] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState('all');
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = medicalRecordService.subscribeToMedicalRecords((records) => {
+      setMedicalRecords(records);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const filteredRecords = medicalRecords.filter(record => {
     const matchesSearch = 
@@ -90,6 +65,62 @@ const DoctorMedicalRecords = () => {
     }
   };
 
+  const [patients, setPatients] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedPatient, setSelectedPatient] = useState<string>('');
+  const [formData, setFormData] = useState({
+    patientId: '',
+    recordType: '',
+    category: '',
+    summary: '',
+    attachments: [] as File[]
+  });
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const allPatients = await patientService.getAllPatients();
+        setPatients(allPatients.map(patient => ({
+          id: patient.id,
+          name: patient.name
+        })));
+      } catch (error) {
+        console.error('Error fetching patients:', error);
+      }
+    };
+
+    fetchPatients();
+  }, []);
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const newRecord: Omit<MedicalRecord, 'id'> = {
+        patientName: patients.find(p => p.id === formData.patientId)?.name || 'Unknown Patient',
+        patientId: formData.patientId,
+        recordType: formData.recordType,
+        category: formData.category,
+        date: new Date().toISOString().split('T')[0],
+        status: 'Normal',
+        provider: user?.displayName || 'Unknown Doctor',
+        summary: formData.summary,
+        attachments: formData.attachments.map(file => file.name)
+      };
+
+      await medicalRecordService.createMedicalRecord(newRecord);
+      
+      // Reset form
+      setFormData({
+        patientId: '',
+        recordType: '',
+        category: '',
+        summary: '',
+        attachments: []
+      });
+    } catch (error) {
+      console.error('Error creating medical record:', error);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       <DoctorSidebar />
@@ -104,7 +135,7 @@ const DoctorMedicalRecords = () => {
             
             <Dialog>
               <DialogTrigger asChild>
-                <Button className="bg-blue-500 hover:bg-blue-600">
+                <Button className="bg-medisync-primary hover:bg-medisync-secondary">
                   <Plus className="h-4 w-4 mr-2" />
                   Add New Record
                 </Button>
@@ -113,24 +144,32 @@ const DoctorMedicalRecords = () => {
                 <DialogHeader>
                   <DialogTitle>Add New Medical Record</DialogTitle>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <form onSubmit={handleFormSubmit} className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="patient">Patient</Label>
-                      <Select>
+                      <Select
+                        value={formData.patientId}
+                        onValueChange={(value) => setFormData({ ...formData, patientId: value })}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="p001">Ransford Agyei</SelectItem>
-                          <SelectItem value="p002">Emma Johnson</SelectItem>
-                          <SelectItem value="p003">Michael Chen</SelectItem>
+                          {patients.map(patient => (
+                            <SelectItem key={patient.id} value={patient.id}>
+                              {patient.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label htmlFor="recordType">Record Type</Label>
-                      <Select>
+                      <Select
+                        value={formData.recordType}
+                        onValueChange={(value) => setFormData({ ...formData, recordType: value })}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
@@ -144,11 +183,21 @@ const DoctorMedicalRecords = () => {
                   </div>
                   <div>
                     <Label htmlFor="category">Category</Label>
-                    <Input id="category" placeholder="e.g., Blood Test, X-Ray, etc." />
+                    <Input
+                      id="category"
+                      placeholder="e.g., Blood Test, X-Ray, etc."
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="summary">Summary</Label>
-                    <Textarea id="summary" placeholder="Enter record summary or findings" />
+                    <Textarea
+                      id="summary"
+                      placeholder="Enter record summary or findings"
+                      value={formData.summary}
+                      onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+                    />
                   </div>
                   <div>
                     <Label>Attachments</Label>
@@ -160,10 +209,10 @@ const DoctorMedicalRecords = () => {
                     </div>
                   </div>
                   <div className="flex justify-end gap-3">
-                    <Button variant="outline">Cancel</Button>
-                    <Button>Save Record</Button>
+                    <Button type="button" variant="outline">Cancel</Button>
+                    <Button type="submit">Save Record</Button>
                   </div>
-                </div>
+                </form>
               </DialogContent>
             </Dialog>
           </div>
@@ -267,4 +316,4 @@ const DoctorMedicalRecords = () => {
   );
 };
 
-export default DoctorMedicalRecords; 
+export default DoctorMedicalRecords;

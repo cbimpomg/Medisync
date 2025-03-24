@@ -1,5 +1,6 @@
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc, limit, onSnapshot } from 'firebase/firestore';
 import { db, collections, User } from '../firebase';
+import { FirebaseError } from 'firebase/app';
 
 // Vitals interface
 export interface VitalSigns {
@@ -303,6 +304,56 @@ export const vitalsService = {
    * @param vitalData - The vital signs data
    * @returns The status ('Normal', 'Abnormal', or 'Critical')
    */
+  /**
+   * Subscribe to vitals updates
+   * @param onUpdate - Callback function to handle updates
+   * @param onError - Callback function to handle errors
+   * @returns Unsubscribe function
+   */
+  subscribeToVitals(onUpdate: (vitals: Array<VitalSigns & { patientName: string }>) => void, onError?: (error: FirebaseError) => void) {
+    try {
+      const vitalsQuery = query(
+        collection(db, collections.vitals),
+        orderBy('timestamp', 'desc')
+      );
+
+      return onSnapshot(vitalsQuery, async (snapshot) => {
+        try {
+          const vitals: Array<VitalSigns & { patientName: string }> = [];
+          
+          for (const docSnapshot of snapshot.docs) {
+            const vitalData = docSnapshot.data() as VitalSigns;
+            
+            // Get the patient's name
+            const patientDoc = await getDoc(doc(db, collections.users, vitalData.patientId));
+            const patientName = patientDoc.exists() ? (patientDoc.data() as User).displayName : 'Unknown Patient';
+            
+            vitals.push({
+              id: docSnapshot.id,
+              ...vitalData,
+              patientName,
+              timestamp: vitalData.timestamp instanceof Timestamp ? 
+                vitalData.timestamp.toDate() : 
+                new Date(vitalData.timestamp)
+            });
+          }
+          
+          onUpdate(vitals);
+        } catch (error) {
+          console.error('Error processing vitals update:', error);
+          onError?.(error);
+        }
+      }, (error) => {
+        console.error('Error in vitals subscription:', error);
+        onError?.(error);
+      });
+    } catch (error) {
+      console.error('Error setting up vitals subscription:', error);
+      onError?.(error);
+      return () => {};
+    }
+  },
+
   determineVitalStatus(vitalData: Partial<VitalSigns>): VitalSigns['status'] {
     // Parse values
     const temp = vitalData.temperature ? parseFloat(vitalData.temperature) : null;

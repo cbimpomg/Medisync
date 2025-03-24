@@ -122,7 +122,7 @@ const DoctorTelehealth = () => {
                 <p className="text-gray-600">Manage virtual consultations</p>
               </div>
               
-              <Button className="bg-blue-500 hover:bg-blue-600 gap-2">
+              <Button className="bg-medisync-primary hover:bg-medisync-secondary gap-2">
                 <Video className="h-4 w-4" />
                 Start New Consultation
               </Button>

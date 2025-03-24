@@ -1,4 +1,4 @@
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, collections } from '../firebase';
 
 export interface Patient {
@@ -13,12 +13,49 @@ export interface Patient {
   status: 'Active' | 'Inactive';
   insuranceProvider: string;
   insuranceNumber: string;
+  nextCheckup?: string;
+  vitals: {
+    temperature: string;
+    bloodPressure: string;
+    heartRate: string;
+    oxygenSaturation: string;
+  };
 }
 
 /**
  * Patient Service - Handles all patient-related operations with Firestore
  */
 export const patientService = {
+  /**
+   * Subscribe to patients updates
+   * @param callback - Function to call when patients data updates
+   * @returns Unsubscribe function
+   */
+  subscribeToPatients(callback: (patients: Patient[]) => void) {
+    try {
+      const patientsQuery = query(
+        collection(db, collections.users),
+        where('role', '==', 'patient')
+      );
+      
+      return onSnapshot(patientsQuery, (snapshot) => {
+        const patients = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.displayName || 'Unknown Patient',
+            ...data as Omit<Patient, 'id'>
+          };
+        });
+        callback(patients);
+      }, (error) => {
+        console.error('Error subscribing to patients:', error);
+      });
+    } catch (error) {
+      console.error('Error setting up patient subscription:', error);
+      throw error;
+    }
+  },
   /**
    * Get all patients
    * @returns Array of patients
@@ -36,7 +73,13 @@ export const patientService = {
         return {
           id: doc.id,
           name: data.displayName || 'Unknown Patient',
-          ...data as Omit<Patient, 'id'>
+          ...data as Omit<Patient, 'id'>,
+          vitals: data.vitals || {
+            temperature: 'N/A',
+            bloodPressure: 'N/A',
+            heartRate: 'N/A',
+            oxygenSaturation: 'N/A'
+          }
         };
       });
     } catch (error) {
@@ -85,7 +128,13 @@ export const patientService = {
         return {
           id: doc.id,
           name: data.displayName || 'Unknown Patient',
-          ...data as Omit<Patient, 'id'>
+          ...data as Omit<Patient, 'id'>,
+          vitals: data.vitals || {
+            temperature: 'N/A',
+            bloodPressure: 'N/A',
+            heartRate: 'N/A',
+            oxygenSaturation: 'N/A'
+          }
         };
       });
     } catch (error) {

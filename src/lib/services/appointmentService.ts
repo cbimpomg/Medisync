@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, orderBy, serverTimestamp, Timestamp, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, collections, Appointment, User } from '../firebase';
 import { notificationService } from './notificationService';
 import { pushNotificationService } from './pushNotificationService';
@@ -7,6 +7,85 @@ import { pushNotificationService } from './pushNotificationService';
  * Appointment Service - Handles all appointment-related operations with Firestore
  */
 export const appointmentService = {
+  /**
+   * Subscribe to appointments updates
+   * @param role - The user's role (doctor, nurse, patient)
+   * @param userId - The user's ID (optional for nurses)
+   * @param onUpdate - Callback function to handle updates
+   * @returns Unsubscribe function
+   */
+  subscribeToAppointments(role: 'doctor' | 'nurse' | 'patient', userId: string | undefined, onUpdate: (appointments: Array<Appointment & { id: string; patientName: string; doctorName: string }>) => void) {
+    let appointmentsQuery;
+    
+    if (role === 'doctor' && userId) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      appointmentsQuery = query(
+        collection(db, collections.appointments),
+        where('doctorId', '==', userId),
+        where('date', '>=', Timestamp.fromDate(today)),
+        where('status', 'in', ['scheduled', 'in-progress']),
+        where('type', '==', 'in-person'),
+        orderBy('date', 'asc'),
+        orderBy('time', 'asc')
+      );
+    } else if (role === 'patient' && userId) {
+      appointmentsQuery = query(
+        collection(db, collections.appointments),
+        where('patientId', '==', userId),
+        orderBy('date', 'asc')
+      );
+    } else {
+      // For nurses, get all appointments (they can see all)
+      appointmentsQuery = query(
+        collection(db, collections.appointments),
+        where('date', '>=', Timestamp.fromDate(new Date())), // Only future appointments
+        orderBy('date', 'asc')
+      );
+    }
+
+    return onSnapshot(appointmentsQuery, async (snapshot) => {
+      try {
+        const appointments: Array<Appointment & {
+          id: string;
+          patientName: string;
+          doctorName: string;
+        }> = [];
+
+        for (const docSnapshot of snapshot.docs) {
+          const appointmentData = docSnapshot.data() as Appointment;
+          
+          // Get patient and doctor details
+          const [patientDoc, doctorDoc] = await Promise.all([
+            getDoc(doc(db, collections.users, appointmentData.patientId)),
+            getDoc(doc(db, collections.users, appointmentData.doctorId))
+          ]);
+          
+          const patientData = patientDoc.exists() ? patientDoc.data() as User : null;
+          const doctorData = doctorDoc.exists() ? doctorDoc.data() as User : null;
+          
+          if (patientData && doctorData) {
+            appointments.push({
+              id: docSnapshot.id,
+              ...appointmentData,
+              patientName: patientData.displayName || 'Unknown Patient',
+              doctorName: doctorData.displayName || 'Unknown Doctor',
+              date: appointmentData.date instanceof Timestamp ? 
+                appointmentData.date.toDate() : 
+                new Date(appointmentData.date)
+            });
+          }
+        }
+
+        onUpdate(appointments);
+      } catch (error) {
+        console.error('Error in telehealth appointments subscription:', error);
+      }
+    }, (error) => {
+      console.error('Telehealth subscription error:', error);
+    });
+  },
+
   /**
    * Get all appointments for a user (doctor, nurse, or patient)
    * @param userId - The user's ID
@@ -18,11 +97,16 @@ export const appointmentService = {
       let appointmentsQuery;
       
       if (role === 'doctor') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         appointmentsQuery = query(
           collection(db, collections.appointments),
           where('doctorId', '==', userId),
+          where('date', '>=', Timestamp.fromDate(today)),
           where('status', '!=', 'cancelled'),
-          orderBy('date', 'desc')
+          where('type', '==', 'in-person'),
+          orderBy('date', 'asc'),
+          orderBy('time', 'asc')
         );
       } else if (role === 'patient') {
         appointmentsQuery = query(
@@ -82,6 +166,94 @@ export const appointmentService = {
    * @param role - The user's role (optional, for filtering)
    * @returns Array of appointments for the specified date
    */
+  /**
+   * Get telehealth appointments for a user
+   * @param userId - The user's ID
+   * @param role - The user's role (doctor, nurse, patient)
+   * @returns Array of telehealth appointments
+   */
+  subscribeToTelehealthAppointments(role: 'doctor' | 'nurse' | 'patient', userId: string | undefined, onUpdate: (appointments: Array<Appointment & { id: string; patientName: string; doctorName: string }>) => void) {
+    let appointmentsQuery;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (role === 'doctor' && userId) {
+      appointmentsQuery = query(
+        collection(db, collections.appointments),
+        where('doctorId', '==', userId),
+        where('date', '>=', Timestamp.fromDate(today)),
+        where('status', 'in', ['scheduled', 'in-progress']),
+        where('type', '==', 'telehealth'),
+        orderBy('date', 'asc'),
+        orderBy('time', 'asc')
+      );
+    } else if (role === 'patient' && userId) {
+      appointmentsQuery = query(
+        collection(db, collections.appointments),
+        where('patientId', '==', userId),
+        where('type', '==', 'telehealth'),
+        where('status', 'in', ['scheduled', 'in-progress']),
+        where('date', '>=', Timestamp.fromDate(today)),
+        orderBy('date', 'asc'),
+        orderBy('time', 'asc')
+      );
+    } else if (role === 'nurse') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      appointmentsQuery = query(
+        collection(db, collections.appointments),
+        where('type', '==', 'telehealth'),
+        where('date', '>=', Timestamp.fromDate(today)),
+        where('status', 'in', ['scheduled', 'in-progress']),
+        orderBy('date', 'asc'),
+        orderBy('time', 'asc')
+      );
+    } else {
+      throw new Error('Invalid role or missing userId');
+    }
+
+    return onSnapshot(appointmentsQuery, async (snapshot) => {
+      try {
+        const appointments: Array<Appointment & {
+          id: string;
+          patientName: string;
+          doctorName: string;
+        }> = [];
+
+        for (const docSnapshot of snapshot.docs) {
+          const appointmentData = docSnapshot.data() as Appointment;
+          
+          const [patientDoc, doctorDoc] = await Promise.all([
+            getDoc(doc(db, collections.users, appointmentData.patientId)),
+            getDoc(doc(db, collections.users, appointmentData.doctorId))
+          ]);
+          
+          const patientData = patientDoc.exists() ? patientDoc.data() as User : null;
+          const doctorData = doctorDoc.exists() ? doctorDoc.data() as User : null;
+          
+          if (patientData && doctorData) {
+            appointments.push({
+              id: docSnapshot.id,
+              ...appointmentData,
+              patientName: patientData.displayName || 'Unknown Patient',
+              doctorName: doctorData.displayName || 'Unknown Doctor',
+              date: appointmentData.date instanceof Timestamp ? 
+                appointmentData.date.toDate() : 
+                new Date(appointmentData.date)
+            });
+          }
+        }
+
+        onUpdate(appointments);
+      } catch (error) {
+        console.error('Error in telehealth appointments subscription:', error);
+      }
+    }, (error) => {
+      console.error('Telehealth subscription error:', error);
+    });
+
+  },
+
   async getAppointmentsByDate(date: Date, userId?: string, role?: 'doctor' | 'nurse' | 'patient') {
     try {
       // Create date range for the specified date (start of day to end of day)
@@ -105,16 +277,16 @@ export const appointmentService = {
         appointmentsQuery = query(
           collection(db, collections.appointments),
           where('patientId', '==', userId),
-          where('date', '>=', startDate),
-          where('date', '<=', endDate),
+          where('date', '>=', Timestamp.fromDate(startDate)),
+          where('date', '<=', Timestamp.fromDate(endDate)),
           orderBy('date', 'asc')
         );
       } else {
         // For nurses or when no userId/role provided
         appointmentsQuery = query(
           collection(db, collections.appointments),
-          where('date', '>=', startDate),
-          where('date', '<=', endDate),
+          where('date', '>=', Timestamp.fromDate(startDate)),
+          where('date', '<=', Timestamp.fromDate(endDate)),
           orderBy('date', 'asc')
         );
       }
@@ -200,6 +372,11 @@ export const appointmentService = {
    */
   async createAppointment(appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
+      // Validate required fields
+      if (!appointmentData.doctorId || !appointmentData.patientId) {
+        throw new Error('Doctor ID and Patient ID are required for appointment creation');
+      }
+
       const newAppointment = {
         ...appointmentData,
         createdAt: serverTimestamp(),

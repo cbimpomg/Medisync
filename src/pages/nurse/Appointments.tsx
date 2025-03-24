@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Calendar, Clock, User, CheckCircle2, XCircle } from 'lucide-react';
+import { appointmentService } from '@/lib/services/appointmentService';
+import { Appointment as AppointmentType } from '@/lib/firebase';
 import NurseSidebar from '@/components/layout/NurseSidebar';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,45 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Mock appointments data
-const appointments = [
-  {
-    id: "APT001",
-    patientName: "Ransford Agyei",
-    patientId: "P001",
-    type: "Routine Checkup",
-    date: "2024-03-20",
-    time: "09:00 AM",
-    duration: "30 minutes",
-    status: "Confirmed",
-    room: "203",
-    notes: "Regular vital signs check"
-  },
-  {
-    id: "APT002",
-    patientName: "Emma Johnson",
-    patientId: "P002",
-    type: "Medication Administration",
-    date: "2024-03-20",
-    time: "10:30 AM",
-    duration: "15 minutes",
-    status: "In Progress",
-    room: "205",
-    notes: "Antibiotic administration"
-  },
-  {
-    id: "APT003",
-    patientName: "Michael Chen",
-    patientId: "P003",
-    type: "Wound Dressing",
-    date: "2024-03-20",
-    time: "11:45 AM",
-    duration: "45 minutes",
-    status: "Pending",
-    room: "210",
-    notes: "Post-surgical wound care"
-  }
-];
+interface ExtendedAppointment extends AppointmentType {
+  id: string;
+  patientName: string;
+  doctorName: string;
+  room?: string;
+  duration?: string;
+}
 
 const appointmentTypes = [
   "All Types",
@@ -59,9 +29,31 @@ const appointmentTypes = [
 ];
 
 const NurseAppointments = () => {
+  const [appointments, setAppointments] = useState<ExtendedAppointment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [selectedTab, setSelectedTab] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Subscribe to appointments updates
+      const unsubscribe = appointmentService.subscribeToAppointments('nurse', undefined, (updatedAppointments) => {
+        setAppointments(updatedAppointments);
+        setIsLoading(false);
+      });
+
+      // Cleanup subscription on component unmount
+      return () => unsubscribe();
+    } catch (err) {
+      console.error('Error subscribing to appointments:', err);
+      setError('Failed to load appointments. Please try again later.');
+      setIsLoading(false);
+    }
+  }, []);
 
   const filteredAppointments = appointments.filter(appointment => {
     const matchesSearch = 
@@ -89,6 +81,28 @@ const NurseAppointments = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <NurseSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <NurseSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-red-500">{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -193,16 +207,16 @@ const NurseAppointments = () => {
                                     </Badge>
                                   </div>
                                   <p className="text-sm text-gray-500">
-                                    {appointment.type} • Room {appointment.room}
+                                    {appointment.type} • Room {appointment.room || 'TBD'}
                                   </p>
                                   <div className="flex items-center gap-4 mt-1">
                                     <div className="flex items-center gap-1 text-sm text-gray-500">
                                       <Calendar className="h-4 w-4" />
-                                      {appointment.date}
+                                      {new Date(appointment.date).toLocaleDateString()}
                                     </div>
                                     <div className="flex items-center gap-1 text-sm text-gray-500">
                                       <Clock className="h-4 w-4" />
-                                      {appointment.time} ({appointment.duration})
+                                      {appointment.time} ({appointment.duration || '30 min'})
                                     </div>
                                   </div>
                                 </div>
@@ -219,14 +233,6 @@ const NurseAppointments = () => {
                                 </Button>
                               </div>
                             </div>
-
-                            {appointment.notes && (
-                              <div className="mt-3 pt-3 border-t">
-                                <p className="text-sm text-gray-600">
-                                  <span className="font-medium">Notes:</span> {appointment.notes}
-                                </p>
-                              </div>
-                            )}
                           </CardContent>
                         </Card>
                       ))}
@@ -242,4 +248,4 @@ const NurseAppointments = () => {
   );
 };
 
-export default NurseAppointments; 
+export default NurseAppointments;

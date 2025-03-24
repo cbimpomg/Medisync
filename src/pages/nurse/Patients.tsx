@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, FileText, Activity, Heart, ClipboardList } from 'lucide-react';
+import { patientService, Patient } from '@/lib/services/patientService';
 import NurseSidebar from '@/components/layout/NurseSidebar';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,83 +10,40 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-// Mock patients data
-const patients = [
-  {
-    id: "P001",
-    name: "Ransford Agyei",
-    age: 35,
-    gender: "Male",
-    room: "201",
-    admissionDate: "2024-03-15",
-    condition: "Stable",
-    diagnosis: "Post-operative care",
-    vitals: {
-      temperature: "37.2°C",
-      bloodPressure: "120/80",
-      heartRate: "72 bpm",
-      oxygenSaturation: "98%"
-    },
-    nextCheckup: "10:30 AM"
-  },
-  {
-    id: "P002",
-    name: "Emma Johnson",
-    age: 28,
-    gender: "Female",
-    room: "205",
-    admissionDate: "2024-03-14",
-    condition: "Critical",
-    diagnosis: "Pneumonia",
-    vitals: {
-      temperature: "38.5°C",
-      bloodPressure: "135/85",
-      heartRate: "95 bpm",
-      oxygenSaturation: "94%"
-    },
-    nextCheckup: "11:00 AM"
-  },
-  {
-    id: "P003",
-    name: "Michael Chen",
-    age: 45,
-    gender: "Male",
-    room: "210",
-    admissionDate: "2024-03-13",
-    condition: "Improving",
-    diagnosis: "Diabetes Management",
-    vitals: {
-      temperature: "36.8°C",
-      bloodPressure: "128/82",
-      heartRate: "68 bpm",
-      oxygenSaturation: "99%"
-    },
-    nextCheckup: "2:15 PM"
-  }
-];
+
 
 const NursePatients = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [conditionFilter, setConditionFilter] = useState('all');
-  const [selectedPatient, setSelectedPatient] = useState<typeof patients[0] | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = patientService.subscribeToPatients((updatedPatients) => {
+      setPatients(updatedPatients);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = 
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (patient.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.diagnosis.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCondition = conditionFilter === 'all' || patient.condition.toLowerCase() === conditionFilter.toLowerCase();
+      (patient.status || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCondition = conditionFilter === 'all' || patient.status?.toLowerCase() === conditionFilter.toLowerCase();
     return matchesSearch && matchesCondition;
   });
 
-  const getConditionColor = (condition: string) => {
-    switch (condition.toLowerCase()) {
-      case 'stable':
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
         return 'bg-green-100 text-green-800';
-      case 'critical':
+      case 'inactive':
         return 'bg-red-100 text-red-800';
-      case 'improving':
-        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -133,9 +91,8 @@ const NursePatients = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Conditions</SelectItem>
-                        <SelectItem value="stable">Stable</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="improving">Improving</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -150,15 +107,15 @@ const NursePatients = () => {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-green-50 p-3 rounded-lg">
-                      <p className="text-sm text-green-600">Stable</p>
+                      <p className="text-sm text-green-600">Active</p>
                       <p className="text-2xl font-bold text-green-700">
-                        {patients.filter(p => p.condition.toLowerCase() === 'stable').length}
+                        {patients.filter(p => p.status?.toLowerCase() === 'active').length}
                       </p>
                     </div>
                     <div className="bg-red-50 p-3 rounded-lg">
-                      <p className="text-sm text-red-600">Critical</p>
+                      <p className="text-sm text-red-600">Inactive</p>
                       <p className="text-2xl font-bold text-red-700">
-                        {patients.filter(p => p.condition.toLowerCase() === 'critical').length}
+                        {patients.filter(p => p.status?.toLowerCase() === 'inactive').length}
                       </p>
                     </div>
                   </div>
@@ -180,15 +137,15 @@ const NursePatients = () => {
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="font-medium">{patient.name}</h3>
-                              <Badge className={getConditionColor(patient.condition)}>
-                                {patient.condition}
+                              <Badge className={getStatusColor(patient.status || 'unknown')}>
+                                {patient.status || 'Unknown'}
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-500">
-                              Room {patient.room} • Admitted: {patient.admissionDate}
+                              Registered: {patient.registrationDate || 'N/A'}
                             </p>
                             <p className="text-sm text-gray-500">
-                              {patient.diagnosis}
+                              {patient.email} • {patient.phone}
                             </p>
                           </div>
                         </div>
@@ -216,19 +173,19 @@ const NursePatients = () => {
                       <div className="mt-4 grid grid-cols-4 gap-4 pt-4 border-t">
                         <div>
                           <p className="text-sm text-gray-500">Temperature</p>
-                          <p className="font-medium">{patient.vitals.temperature}</p>
+                          <p className="font-medium">{patient.vitals?.temperature || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Blood Pressure</p>
-                          <p className="font-medium">{patient.vitals.bloodPressure}</p>
+                          <p className="font-medium">{patient.vitals?.bloodPressure || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Heart Rate</p>
-                          <p className="font-medium">{patient.vitals.heartRate}</p>
+                          <p className="font-medium">{patient.vitals?.heartRate || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">O2 Saturation</p>
-                          <p className="font-medium">{patient.vitals.oxygenSaturation}</p>
+                          <p className="font-medium">{patient.vitals?.oxygenSaturation || 'N/A'}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -243,4 +200,4 @@ const NursePatients = () => {
   );
 };
 
-export default NursePatients; 
+export default NursePatients;
