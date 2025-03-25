@@ -22,12 +22,60 @@ export interface AuthState {
 
 export const useAuth = () => {
   const navigate = useNavigate();
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    loading: true,
-    error: null,
-    isAuthenticated: false
-  });
+  
+  // Generate a unique session ID for this tab
+  const [sessionId] = useState(() => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+
+  // Initialize auth state from session storage
+  const getInitialAuthState = (): AuthState => {
+    const storedState = sessionStorage.getItem(`authState_${window.location.origin}_${sessionId}`);
+    return storedState ? JSON.parse(storedState) : {
+      user: null,
+      loading: true,
+      error: null,
+      isAuthenticated: false
+    };
+  };
+
+  const [authState, setAuthState] = useState<AuthState>(getInitialAuthState());
+
+  // Update session storage when auth state changes
+  const updateAuthState = (newState: AuthState) => {
+    setAuthState(newState);
+    sessionStorage.setItem(`authState_${window.location.origin}_${sessionId}`, JSON.stringify(newState));
+    // Broadcast the change to other tabs
+    const broadcastChannel = new BroadcastChannel('auth_state_change');
+    broadcastChannel.postMessage({ sessionId, state: newState });
+  };
+
+  // Handle auth state changes across tabs using BroadcastChannel
+  useEffect(() => {
+    const broadcastChannel = new BroadcastChannel('auth_state_change');
+
+    const handleMessage = (event: MessageEvent) => {
+      const { sessionId: broadcastSessionId, state } = event.data;
+      // Only update if the message is from a different tab
+      if (broadcastSessionId !== sessionId) {
+        if (state === null) {
+          // Another tab logged out
+          setAuthState({
+            user: null,
+            loading: false,
+            error: null,
+            isAuthenticated: false
+          });
+          navigate('/login');
+        } else {
+          setAuthState(state);
+        }
+      }
+    };
+
+    broadcastChannel.addEventListener('message', handleMessage);
+    return () => {
+      broadcastChannel.close();
+    };
+  }, [navigate, sessionId]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Monitor online/offline status
@@ -171,6 +219,9 @@ export const useAuth = () => {
         const newUserData = {
           ...userData,
           uid: firebaseUser.uid,
+          email: userData.email,
+          displayName: userData.displayName,
+          role: userData.role,
           createdAt: new Date(),
           updatedAt: new Date()
         };
@@ -182,9 +233,18 @@ export const useAuth = () => {
       });
   
       if (result) {
+        const { userData } = result;
+        const user: User = {
+          uid: userData.uid,
+          email: userData.email,
+          displayName: userData.displayName,
+          role: userData.role,
+          createdAt: userData.createdAt,
+          updatedAt: userData.updatedAt
+        };
         setAuthState(prev => ({
           ...prev,
-          user: result.userData,
+          user,
           loading: false,
           error: null,
           isAuthenticated: true
@@ -220,73 +280,85 @@ export const useAuth = () => {
 
   const signIn = async (email: string, password: string) => {
     if (!isOnline) {
+      const offlineError = 'Cannot sign in while offline. Please check your internet connection.';
       setAuthState(prev => ({
         ...prev,
         loading: false,
-        error: 'Cannot sign in while offline. Please check your internet connection.'
+        error: offlineError,
+        isAuthenticated: false
       }));
-      return;
+      throw new Error(offlineError);
     }
 
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
       
-      // Fetch user data from Firestore
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (!userDoc.exists()) {
-        // If user document doesn't exist in Firestore but exists in Firebase Auth
-        // Create a basic user object with data from Firebase Auth
-        // Make sure to use the displayName from Firebase Auth
-        const basicUserData: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || '',
-          role: 'patient', // Default role
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
+      // Implement retry with backoff for authentication
+      const { user: firebaseUser } = await retryWithBackoff(
+        () => signInWithEmailAndPassword(auth, email, password)
+      );
+      
+      if (!firebaseUser) {
+        throw new Error('Authentication failed');
+      }
+
+      try {
+        // Fetch user data from Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         
-        // Set auth state with basic user data
-        setAuthState({
-          user: basicUserData,
+        let userData: User;
+        
+        if (!userDoc.exists()) {
+          // If user document doesn't exist in Firestore but exists in Firebase Auth
+          userData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || '',
+            role: 'patient', // Default role
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          // Create the user document in Firestore to ensure persistence
+          await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+        } else {
+          userData = userDoc.data() as User;
+        }
+
+        // Update auth state with user data
+        updateAuthState({
+          user: userData,
           loading: false,
           error: null,
           isAuthenticated: true
         });
-        
-        // Create the user document in Firestore to ensure persistence
-        await setDoc(doc(db, 'users', firebaseUser.uid), basicUserData);
-        
+
         // Redirect based on user role
-        navigate('/dashboard');
-        return;
-      }
-
-      const userData = userDoc.data() as User;
-      
-      // Set auth state before navigation to ensure loading state is updated
-      setAuthState({
-        user: userData,
-        loading: false,
-        error: null,
-        isAuthenticated: true
-      });
-
-      // Redirect based on user role
-      switch (userData.role) {
-        case 'admin':
-          navigate('/admin/dashboard');
-          break;
-        case 'doctor':
-          navigate('/doctor/dashboard');
-          break;
-        case 'nurse':
-          navigate('/nurse/dashboard');
-          break;
-        case 'patient':
-          navigate('/dashboard');
-          break;
+        switch (userData.role) {
+          case 'admin':
+            navigate('/admin/dashboard');
+            break;
+          case 'doctor':
+            navigate('/doctor/dashboard');
+            break;
+          case 'nurse':
+            navigate('/nurse/dashboard');
+            break;
+          case 'patient':
+          default:
+            navigate('/dashboard');
+            break;
+        }
+      } catch (firestoreError) {
+        console.error('Error fetching/creating user data:', firestoreError);
+        const errorMessage = 'Failed to load user profile. Please try again.';
+        setAuthState(prev => ({
+          ...prev,
+          loading: false,
+          error: errorMessage,
+          isAuthenticated: false
+        }));
+        throw new Error(errorMessage);
       }
     } catch (error) {
       const errorMessage = handleAuthError(error);
@@ -296,7 +368,6 @@ export const useAuth = () => {
         error: errorMessage,
         isAuthenticated: false
       }));
-      // Re-throw the error to be handled by the component
       throw error;
     }
   };
@@ -304,12 +375,24 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       await signOut(auth);
+      // Clear this tab's session storage
+      sessionStorage.removeItem(`authState_${window.location.origin}_${sessionId}`);
+      // Notify other tabs about logout
+      const broadcastChannel = new BroadcastChannel('auth_state_change');
+      broadcastChannel.postMessage({ sessionId, state: null });
+      broadcastChannel.close();
+      updateAuthState({
+        user: null,
+        loading: false,
+        error: null,
+        isAuthenticated: false
+      });
       navigate('/login');
     } catch (error) {
-      setAuthState(prev => ({
-        ...prev,
+      updateAuthState({
+        ...authState,
         error: 'Failed to logout'
-      }));
+      });
     }
   };
 

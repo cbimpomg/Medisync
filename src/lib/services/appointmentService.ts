@@ -18,14 +18,10 @@ export const appointmentService = {
     let appointmentsQuery;
     
     if (role === 'doctor' && userId) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       appointmentsQuery = query(
         collection(db, collections.appointments),
         where('doctorId', '==', userId),
-        where('date', '>=', Timestamp.fromDate(today)),
-        where('status', 'in', ['scheduled', 'in-progress']),
-        where('type', '==', 'in-person'),
+        where('status', '!=', 'cancelled'),
         orderBy('date', 'asc'),
         orderBy('time', 'asc')
       );
@@ -97,14 +93,10 @@ export const appointmentService = {
       let appointmentsQuery;
       
       if (role === 'doctor') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         appointmentsQuery = query(
           collection(db, collections.appointments),
           where('doctorId', '==', userId),
-          where('date', '>=', Timestamp.fromDate(today)),
           where('status', '!=', 'cancelled'),
-          where('type', '==', 'in-person'),
           orderBy('date', 'asc'),
           orderBy('time', 'asc')
         );
@@ -181,9 +173,7 @@ export const appointmentService = {
       appointmentsQuery = query(
         collection(db, collections.appointments),
         where('doctorId', '==', userId),
-        where('date', '>=', Timestamp.fromDate(today)),
-        where('status', 'in', ['scheduled', 'in-progress']),
-        where('type', '==', 'telehealth'),
+        where('status', '!=', 'cancelled'),
         orderBy('date', 'asc'),
         orderBy('time', 'asc')
       );

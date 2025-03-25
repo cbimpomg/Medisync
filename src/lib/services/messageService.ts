@@ -130,7 +130,9 @@ export const messageService = {
           senderId: data.senderId,
           senderName: 'You',
           content: data.content,
-          timestamp: (data.createdAt as Timestamp).toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          timestamp: data.createdAt instanceof Timestamp
+            ? data.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
           read: data.read
         });
       });
@@ -146,7 +148,9 @@ export const messageService = {
           senderId: data.senderId,
           senderName: partnerName,
           content: data.content,
-          timestamp: (data.createdAt as Timestamp).toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          timestamp: data.createdAt instanceof Timestamp
+            ? data.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
           read: data.read
         });
       });
@@ -208,15 +212,6 @@ export const messageService = {
         }
       });
 
-      // Set up listeners for both queries
-      const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
-        processMessagesUpdate(snapshot, true);
-      });
-
-      const unsubscribeReceived = onSnapshot(receivedQuery, (snapshot) => {
-        processMessagesUpdate(snapshot, false);
-      });
-
       // Keep track of all messages
       const allMessages = new Map();
 
@@ -258,6 +253,16 @@ export const messageService = {
         // Call the callback with the updated messages
         callback(sortedMessages);
       };
+
+      // Set up listeners for both queries
+      const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
+        processMessagesUpdate(snapshot, true);
+      });
+
+      const unsubscribeReceived = onSnapshot(receivedQuery, (snapshot) => {
+        processMessagesUpdate(snapshot, false);
+      });
+
 
       // Return a function to unsubscribe from both listeners
       return () => {
